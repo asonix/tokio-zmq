@@ -19,7 +19,7 @@
 
 use std::rc::Rc;
 
-use async::future::ZmqResponse;
+use async::future::{ZmqRequest, ZmqResponse};
 
 use zmq;
 use futures::Future;
@@ -60,6 +60,7 @@ impl Req {
     }
 
     pub fn send(&self, msg: zmq::Message) -> impl Future<Item = zmq::Message, Error = zmq::Error> {
-        ZmqResponse::new(Rc::clone(&self.sock), msg)
+        let sock = Rc::clone(&self.sock);
+        ZmqRequest::new(Rc::clone(&self.sock), msg).and_then(|_| ZmqResponse::new(sock))
     }
 }

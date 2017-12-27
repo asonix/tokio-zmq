@@ -87,11 +87,8 @@ pub struct ZmqResponse {
 }
 
 impl ZmqResponse {
-    pub fn new(
-        socket: Rc<zmq::Socket>,
-        msg: zmq::Message,
-    ) -> impl Future<Item = zmq::Message, Error = zmq::Error> {
-        ZmqRequest::new(Rc::clone(&socket), msg).and_then(|_| ZmqResponse { socket: socket })
+    pub fn new(socket: Rc<zmq::Socket>) -> impl Future<Item = zmq::Message, Error = zmq::Error> {
+        ZmqResponse { socket: socket }
     }
 
     fn receive(&mut self) -> Result<Async<zmq::Message>, zmq::Error> {
