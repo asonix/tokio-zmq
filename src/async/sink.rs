@@ -25,18 +25,12 @@ use zmq;
 use futures::{Async, AsyncSink, Poll, Sink, StartSend};
 
 #[derive(Clone)]
-pub struct ZmqSink<H>
-where
-    H: super::RepHandler,
-{
+pub struct ZmqSink<E> {
     socket: Rc<zmq::Socket>,
-    phantom: PhantomData<H>,
+    phantom: PhantomData<E>,
 }
 
-impl<H> ZmqSink<H>
-where
-    H: super::RepHandler,
-{
+impl<E> ZmqSink<E> {
     pub fn new(sock: Rc<zmq::Socket>) -> Self {
         ZmqSink {
             socket: sock,
@@ -89,12 +83,9 @@ where
     }
 }
 
-impl<H> Sink for ZmqSink<H>
-where
-    H: super::RepHandler,
-{
+impl<E> Sink for ZmqSink<E> {
     type SinkItem = zmq::Message;
-    type SinkError = H::Error;
+    type SinkError = E;
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         Ok(self.send_message(item))
@@ -105,10 +96,7 @@ where
     }
 }
 
-impl<H> fmt::Debug for ZmqSink<H>
-where
-    H: super::RepHandler,
-{
+impl<E> fmt::Debug for ZmqSink<E> {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         write!(f, "ZmqSink")
     }

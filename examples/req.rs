@@ -22,20 +22,14 @@ extern crate tokio_core;
 extern crate futures;
 extern crate zmq_futures;
 
-use std::rc::Rc;
-
 use tokio_core::reactor::Core;
 use futures::stream::iter_ok;
 use futures::{Future, Stream};
 
-use zmq_futures::RepBuilder;
+use zmq_futures::async::req::ReqBuilder;
 
 fn main() {
-    let context = zmq::Context::new();
-    let sock = context.socket(zmq::REQ).unwrap();
-    let zmq_async = RepBuilder::new(Rc::new(sock))
-        .connect("tcp://localhost:5560")
-        .unwrap();
+    let zmq_async = ReqBuilder::new().connect("tcp://localhost:5560").unwrap();
 
     let mut core = Core::new().unwrap();
 

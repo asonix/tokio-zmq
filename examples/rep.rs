@@ -22,11 +22,9 @@ extern crate tokio_core;
 extern crate zmq;
 extern crate zmq_futures;
 
-use std::rc::Rc;
-
 use futures::Future;
 use tokio_core::reactor::Core;
-use zmq_futures::{RepBuilder, RepHandler};
+use zmq_futures::async::rep::{RepBuilder, RepHandler};
 
 #[derive(Debug)]
 pub enum Error {
@@ -56,9 +54,7 @@ impl RepHandler for Echo {
 
 fn main() {
     let mut core = Core::new().unwrap();
-    let context = zmq::Context::new();
-    let sock = context.socket(zmq::REP).unwrap();
-    let zmq = RepBuilder::new(Rc::new(sock))
+    let zmq = RepBuilder::new()
         .handler(Echo {})
         .bind("tcp://*:5560")
         .unwrap();
