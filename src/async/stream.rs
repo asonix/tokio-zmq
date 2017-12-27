@@ -40,7 +40,8 @@ impl ZmqStream {
         // Don't block waiting for an item to become ready
         match zmq::poll(&mut items, 1) {
             Ok(_) => (),
-            Err(_) => {
+            Err(err) => {
+                println!("err: {}", err);
                 return Async::NotReady;
             }
         };

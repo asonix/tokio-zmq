@@ -23,11 +23,11 @@ use async::stream::ZmqStream;
 
 use zmq;
 
-pub struct SubClient {
+pub struct Sub {
     sock: Rc<zmq::Socket>,
 }
 
-impl SubClient {
+impl Sub {
     pub fn new() -> SubBuilder {
         SubBuilder::new()
     }
@@ -51,14 +51,33 @@ impl SubBuilder {
         }
     }
 
-    pub fn connect(self, addr: &str) -> zmq::Result<SubClient> {
+    pub fn connect(self, addr: &str) -> SubFilter {
         match self {
             SubBuilder::Sock(sock) => {
-                sock.connect(addr)?;
-
-                Ok(SubClient { sock })
+                match sock.connect(addr) {
+                    Ok(_) => SubFilter::Sock(sock),
+                    Err(e) => SubFilter::Fail(e),
+                }
             }
-            SubBuilder::Fail(e) => Err(e),
+            SubBuilder::Fail(e) => SubFilter::Fail(e),
+        }
+    }
+}
+
+pub enum SubFilter {
+    Sock(Rc<zmq::Socket>),
+    Fail(zmq::Error),
+}
+
+impl SubFilter {
+    pub fn filter(self, filter: &[u8]) -> zmq::Result<Sub> {
+        match self {
+            SubFilter::Sock(sock) => {
+                sock.set_subscribe(filter)?;
+
+                Ok(Sub { sock })
+            }
+            SubFilter::Fail(e) => Err(e),
         }
     }
 }
