@@ -33,12 +33,14 @@ fn main() {
         .filter("H".as_bytes())
         .unwrap();
 
-    let consumer = conn.stream().for_each(|msg| {
-        let msg = msg.as_str().unwrap();
-        println!("Received: '{}'", msg);
+    let consumer = conn.stream()
+        .and_then(|msg| msg.map(|msg| msg.to_vec()).concat2())
+        .for_each(|msg| {
+            let msg = String::from_utf8(msg).unwrap();
+            println!("Received: '{}'", msg);
 
-        Ok(())
-    });
+            Ok(())
+        });
 
     core.run(consumer).unwrap();
 }

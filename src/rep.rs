@@ -20,14 +20,14 @@
 use std::rc::Rc;
 use std::fmt::Debug;
 
-use async::stream::ZmqStream;
+use async::stream::{MsgStream, ZmqStream};
 use async::sink::ZmqSink;
 
 use zmq;
 use futures::{Future, Stream};
 
 pub trait RepHandler: Clone {
-    type Request: From<zmq::Message>;
+    type Request: From<MsgStream>;
     type Response: Into<zmq::Message>;
     type Error: From<zmq::Error> + Sized + Debug;
 

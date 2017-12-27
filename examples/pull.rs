@@ -30,12 +30,14 @@ fn main() {
     let mut core = Core::new().unwrap();
     let conn = Pull::new().bind("tcp://*:5558").unwrap();
 
-    let process = conn.stream().for_each(|msg| {
-        let msg = msg.as_str().unwrap();
-        println!("msg: '{}'", msg);
+    let process = conn.stream()
+        .and_then(|msg| msg.map(|msg| msg.to_vec()).concat2())
+        .for_each(|msg| {
+            let msg = String::from_utf8(msg).unwrap();
+            println!("msg: '{}'", msg);
 
-        Ok(())
-    });
+            Ok(())
+        });
 
     core.run(process).unwrap();
 }

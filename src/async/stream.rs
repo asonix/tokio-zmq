@@ -25,17 +25,22 @@ use futures::{Async, Poll, Stream};
 use futures::task;
 
 #[derive(Clone)]
-pub struct ZmqStream {
-    socket: Rc<zmq::Socket>,
+pub struct MsgStream {
+    socket: Option<Rc<zmq::Socket>>,
 }
 
-impl ZmqStream {
+impl MsgStream {
     pub fn new(sock: Rc<zmq::Socket>) -> Self {
-        ZmqStream { socket: sock }
+        MsgStream { socket: Some(sock) }
     }
 
-    fn next_message(&self) -> Result<Async<Option<zmq::Message>>, zmq::Error> {
-        let mut items = [self.socket.as_poll_item(zmq::POLLIN)];
+    fn next_message(&mut self) -> Result<Async<Option<zmq::Message>>, zmq::Error> {
+        let socket = match self.socket.take() {
+            Some(socket) => socket,
+            None => return Ok(Async::Ready(None)),
+        };
+
+        let mut items = [socket.as_poll_item(zmq::POLLIN)];
 
         // Don't block waiting for an item to become ready
         zmq::poll(&mut items, 1)?;
@@ -44,9 +49,12 @@ impl ZmqStream {
 
         for item in items.iter() {
             if item.is_readable() {
-                match self.socket.recv(&mut msg, zmq::DONTWAIT) {
+                match socket.recv(&mut msg, zmq::DONTWAIT) {
                     Ok(_) => {
                         task::current().notify();
+                        if msg.get_more() {
+                            self.socket = Some(Rc::clone(&socket));
+                        }
                         return Ok(Async::Ready(Some(msg)));
                     }
                     Err(zmq::Error::EAGAIN) => (),
@@ -57,17 +65,43 @@ impl ZmqStream {
             }
         }
 
+        self.socket = Some(Rc::clone(&socket));
+
         task::current().notify();
         Ok(Async::NotReady)
     }
 }
 
-impl Stream for ZmqStream {
+impl Stream for MsgStream {
     type Item = zmq::Message;
     type Error = zmq::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         self.next_message()
+    }
+}
+
+#[derive(Clone)]
+pub struct ZmqStream {
+    socket: Rc<zmq::Socket>,
+}
+
+impl ZmqStream {
+    pub fn new(sock: Rc<zmq::Socket>) -> Self {
+        ZmqStream { socket: sock }
+    }
+
+    fn next_message(&self) -> Async<Option<MsgStream>> {
+        Async::Ready(Some(MsgStream::new(Rc::clone(&self.socket))))
+    }
+}
+
+impl Stream for ZmqStream {
+    type Item = MsgStream;
+    type Error = zmq::Error;
+
+    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+        Ok(self.next_message())
     }
 }
 

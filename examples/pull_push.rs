@@ -23,8 +23,9 @@ extern crate zmq;
 extern crate zmq_futures;
 
 use std::io;
+use std::string::FromUtf8Error;
 
-use futures::Stream;
+use futures::{Future, Stream};
 use tokio_core::reactor::Core;
 use zmq_futures::push::Push;
 use zmq_futures::pull::Pull;
@@ -33,6 +34,7 @@ use zmq_futures::pull::Pull;
 enum Error {
     Zmq(zmq::Error),
     Io(io::Error),
+    Utf8(FromUtf8Error),
 }
 
 impl From<zmq::Error> for Error {
@@ -47,6 +49,12 @@ impl From<io::Error> for Error {
     }
 }
 
+impl From<FromUtf8Error> for Error {
+    fn from(e: FromUtf8Error) -> Self {
+        Error::Utf8(e)
+    }
+}
+
 fn main() {
     let mut core = Core::new().unwrap();
     let stream = Pull::new().connect("tcp://localhost:5557").unwrap();
@@ -56,7 +64,10 @@ fn main() {
         .stream()
         .map_err(Error::from)
         .and_then(|msg| {
-            let msg = msg.as_str().unwrap();
+            msg.map(|msg| msg.to_vec()).concat2().map_err(Error::from)
+        })
+        .and_then(|msg| {
+            let msg = String::from_utf8(msg)?;
             println!("msg: '{}'", msg);
             zmq::Message::from_slice(msg.as_bytes()).map_err(Error::from)
         })

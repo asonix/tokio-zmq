@@ -61,7 +61,11 @@ fn main() {
         iter_ok(0..100)
             .zip(interval)
             .map_err(Error::from)
-            .and_then(|_| zmq::Message::from_slice(b"50").map_err(Error::from))
+            .and_then(|(i, _)| {
+                println!("Sending: {}", i);
+
+                Ok(zmq::Message::from_slice(format!("{}", i).as_bytes())?)
+            })
             .forward(workers.sink::<Error>())
     });
 

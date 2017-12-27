@@ -23,16 +23,18 @@ extern crate zmq;
 extern crate zmq_futures;
 
 use std::io;
+use std::string::FromUtf8Error;
 
-use futures::{Future, IntoFuture};
+use futures::{Future, Stream};
 use tokio_core::reactor::Core;
 use zmq_futures::rep::{RepBuilder, RepHandler};
+use zmq_futures::async::stream::MsgStream;
 
 #[derive(Debug)]
 pub enum Error {
     Zmq(zmq::Error),
     Io(io::Error),
-    StringRepresentation,
+    Utf8(FromUtf8Error),
 }
 
 impl From<zmq::Error> for Error {
@@ -47,28 +49,39 @@ impl From<io::Error> for Error {
     }
 }
 
+impl From<FromUtf8Error> for Error {
+    fn from(e: FromUtf8Error) -> Self {
+        Error::Utf8(e)
+    }
+}
+
 #[derive(Clone)]
 pub struct Echo;
 
 impl RepHandler for Echo {
-    type Request = zmq::Message;
+    type Request = MsgStream;
     type Response = zmq::Message;
     type Error = Error;
 
     type Future = Box<Future<Item = Self::Response, Error = Self::Error>>;
 
     fn call(&self, req: Self::Request) -> Self::Future {
-        let res = req.as_str()
-            .ok_or(Error::StringRepresentation)
-            .map(|msg| {
-                println!("Received: '{}'", msg);
-                msg
-            })
+        let res = req.map(|msg| msg.to_vec())
+            .concat2()
+            .map_err(Error::from)
             .and_then(|msg| {
-                zmq::Message::from_slice(msg.as_bytes()).map_err(Error::from)
+                String::from_utf8(msg)
+                    .map_err(Error::from)
+                    .map(|msg| {
+                        println!("Received: '{}'", msg);
+                        msg
+                    })
+                    .and_then(|msg| {
+                        zmq::Message::from_slice(msg.as_bytes()).map_err(Error::from)
+                    })
             });
 
-        Box::new(res.into_future())
+        Box::new(res)
     }
 }
 
