@@ -1,6 +1,16 @@
 # ZeroMQ Futures
 
-This crate contains wrappers around ZeroMQ Concepts with Futures. So far it supports REP sockets, binding and connecting.
+This crate contains wrappers around ZeroMQ Concepts with Futures.
+
+Currently Supported Sockets
+ - REP (binding)
+ - REQ (connecting)
+ - PUB (binding)
+ - SUB (connecting)
+ - PUSH (binding, connecting)
+ - PULL (binding, connecting)
+
+See the [examples folder](https://github.com/asonix/zmq-futures/tree/master/examples) for usage examples.
 
 ### License
 
