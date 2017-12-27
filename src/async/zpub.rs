@@ -20,8 +20,10 @@
 use std::rc::Rc;
 
 use async::sink::ZmqSink;
+use async::future::ZmqRequest;
 
 use zmq;
+use futures::Future;
 
 pub struct Pub {
     sock: Rc<zmq::Socket>,
@@ -30,6 +32,10 @@ pub struct Pub {
 impl Pub {
     pub fn new() -> PubBuilder {
         PubBuilder::new()
+    }
+
+    pub fn send(&self, msg: zmq::Message) -> impl Future<Item = (), Error = ()> {
+        ZmqRequest::new(Rc::clone(&self.sock), msg)
     }
 
     pub fn sink<H>(&self) -> ZmqSink<H> {

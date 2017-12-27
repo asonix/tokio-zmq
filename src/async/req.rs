@@ -22,6 +22,7 @@ use std::rc::Rc;
 use async::future::ZmqResponse;
 
 use zmq;
+use futures::Future;
 
 pub enum ReqBuilder {
     Sock(Rc<zmq::Socket>),
@@ -58,7 +59,7 @@ impl ReqClient {
         ReqBuilder::new()
     }
 
-    pub fn send(&self, msg: zmq::Message) -> ZmqResponse {
+    pub fn send(&self, msg: zmq::Message) -> impl Future<Item = zmq::Message, Error = ()> {
         ZmqResponse::new(Rc::clone(&self.sock), msg)
     }
 }
