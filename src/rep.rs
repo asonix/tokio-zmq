@@ -29,7 +29,7 @@ use futures::{Future, Stream};
 pub trait RepHandler: Clone {
     type Request: From<zmq::Message>;
     type Response: Into<zmq::Message>;
-    type Error: From<()> + Sized + Debug;
+    type Error: From<zmq::Error> + Sized + Debug;
 
     type Future: Future<Item = Self::Response, Error = Self::Error>;
 

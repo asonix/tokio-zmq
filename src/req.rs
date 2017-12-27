@@ -59,7 +59,7 @@ impl Req {
         ReqBuilder::new()
     }
 
-    pub fn send(&self, msg: zmq::Message) -> impl Future<Item = zmq::Message, Error = ()> {
+    pub fn send(&self, msg: zmq::Message) -> impl Future<Item = zmq::Message, Error = zmq::Error> {
         ZmqResponse::new(Rc::clone(&self.sock), msg)
     }
 }

@@ -34,17 +34,11 @@ impl ZmqStream {
         ZmqStream { socket: sock }
     }
 
-    fn next_message(&self) -> Async<Option<zmq::Message>> {
+    fn next_message(&self) -> Result<Async<Option<zmq::Message>>, zmq::Error> {
         let mut items = [self.socket.as_poll_item(zmq::POLLIN)];
 
         // Don't block waiting for an item to become ready
-        match zmq::poll(&mut items, 1) {
-            Ok(_) => (),
-            Err(err) => {
-                println!("err: {}", err);
-                return Async::NotReady;
-            }
-        };
+        zmq::poll(&mut items, 1)?;
 
         let mut msg = zmq::Message::new().unwrap();
 
@@ -53,29 +47,27 @@ impl ZmqStream {
                 match self.socket.recv(&mut msg, zmq::DONTWAIT) {
                     Ok(_) => {
                         task::current().notify();
-                        return Async::Ready(Some(msg));
+                        return Ok(Async::Ready(Some(msg)));
                     }
-                    Err(zmq::Error::EAGAIN) => {
-                        println!("Socket not ready, wait");
-                    }
+                    Err(zmq::Error::EAGAIN) => (),
                     Err(err) => {
-                        println!("Error checking item: {}", err);
+                        return Err(err);
                     }
                 }
             }
         }
 
         task::current().notify();
-        Async::NotReady
+        Ok(Async::NotReady)
     }
 }
 
 impl Stream for ZmqStream {
     type Item = zmq::Message;
-    type Error = ();
+    type Error = zmq::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        Ok(self.next_message())
+        self.next_message()
     }
 }
 

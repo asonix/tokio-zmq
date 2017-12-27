@@ -22,12 +22,31 @@ extern crate tokio_core;
 extern crate zmq;
 extern crate zmq_futures;
 
+use std::io;
 use std::time::Duration;
 
 use futures::{Future, Stream};
 use futures::stream::iter_ok;
 use tokio_core::reactor::{Core, Interval};
 use zmq_futures::push::Push;
+
+#[derive(Debug)]
+enum Error {
+    Zmq(zmq::Error),
+    Io(io::Error),
+}
+
+impl From<zmq::Error> for Error {
+    fn from(e: zmq::Error) -> Self {
+        Error::Zmq(e)
+    }
+}
+
+impl From<io::Error> for Error {
+    fn from(e: io::Error) -> Self {
+        Error::Io(e)
+    }
+}
 
 fn main() {
     let mut core = Core::new().unwrap();
@@ -38,12 +57,12 @@ fn main() {
 
     let interval = Interval::new(Duration::from_secs(1), &core.handle()).unwrap();
 
-    let process = sink.send(start).and_then(|_| {
+    let process = sink.send(start).map_err(Error::from).and_then(|_| {
         iter_ok(0..100)
             .zip(interval)
-            .map_err(|_| ())
-            .and_then(|_| zmq::Message::from_slice(b"50").map_err(|_| ()))
-            .forward(workers.sink())
+            .map_err(Error::from)
+            .and_then(|_| zmq::Message::from_slice(b"50").map_err(Error::from))
+            .forward(workers.sink::<Error>())
     });
 
     core.run(process).unwrap();

@@ -28,12 +28,12 @@ use zmq_futures::rep::{RepBuilder, RepHandler};
 
 #[derive(Debug)]
 pub enum Error {
-    One,
+    Zmq(zmq::Error),
 }
 
-impl From<()> for Error {
-    fn from(_: ()) -> Self {
-        Error::One
+impl From<zmq::Error> for Error {
+    fn from(e: zmq::Error) -> Self {
+        Error::Zmq(e)
     }
 }
 

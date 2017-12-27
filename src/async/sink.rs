@@ -25,12 +25,18 @@ use zmq;
 use futures::{Async, AsyncSink, Poll, Sink, StartSend};
 
 #[derive(Clone)]
-pub struct ZmqSink<E> {
+pub struct ZmqSink<E>
+where
+    E: From<zmq::Error>,
+{
     socket: Rc<zmq::Socket>,
     phantom: PhantomData<E>,
 }
 
-impl<E> ZmqSink<E> {
+impl<E> ZmqSink<E>
+where
+    E: From<zmq::Error>,
+{
     pub fn new(sock: Rc<zmq::Socket>) -> Self {
         ZmqSink {
             socket: sock,
@@ -38,28 +44,20 @@ impl<E> ZmqSink<E> {
         }
     }
 
-    fn send_message(&mut self, msg: zmq::Message) -> AsyncSink<zmq::Message> {
+    fn send_message(&mut self, msg: zmq::Message) -> Result<AsyncSink<zmq::Message>, zmq::Error> {
         let mut items = [self.socket.as_poll_item(zmq::POLLOUT)];
 
-        match zmq::poll(&mut items, 1) {
-            Ok(_) => (),
-            Err(err) => {
-                println!("Error in poll: {}", err);
-                return AsyncSink::NotReady(msg);
-            }
-        };
+        zmq::poll(&mut items, 1)?;
 
         for item in items.iter() {
             if item.is_writable() {
                 match self.socket.send(&msg, zmq::DONTWAIT) {
                     Ok(_) => {
-                        return AsyncSink::Ready;
+                        return Ok(AsyncSink::Ready);
                     }
-                    Err(zmq::Error::EAGAIN) => {
-                        println!("Socket full, wait");
-                    }
+                    Err(zmq::Error::EAGAIN) => (),
                     Err(err) => {
-                        println!("Error checking item: {}", err);
+                        return Err(err);
                     }
                 }
 
@@ -67,36 +65,36 @@ impl<E> ZmqSink<E> {
             }
         }
 
-        AsyncSink::NotReady(msg)
+        Ok(AsyncSink::NotReady(msg))
     }
 
-    fn flush(&mut self) -> Async<()> {
+    fn flush(&mut self) -> Result<Async<()>, zmq::Error> {
         let mut items = [self.socket.as_poll_item(zmq::POLLOUT)];
 
-        match zmq::poll(&mut items, 1) {
-            Ok(_) => Async::Ready(()),
-            Err(err) => {
-                println!("Error in poll: {}", err);
-                Async::Ready(())
-            }
-        }
+        zmq::poll(&mut items, 1).map(|_| Async::Ready(()))
     }
 }
 
-impl<E> Sink for ZmqSink<E> {
+impl<E> Sink for ZmqSink<E>
+where
+    E: From<zmq::Error>,
+{
     type SinkItem = zmq::Message;
     type SinkError = E;
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        Ok(self.send_message(item))
+        Ok(self.send_message(item)?)
     }
 
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        Ok(self.flush())
+        Ok(self.flush()?)
     }
 }
 
-impl<E> fmt::Debug for ZmqSink<E> {
+impl<E> fmt::Debug for ZmqSink<E>
+where
+    E: From<zmq::Error>,
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         write!(f, "ZmqSink")
     }

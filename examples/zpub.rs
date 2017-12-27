@@ -22,11 +22,30 @@ extern crate tokio_core;
 extern crate zmq;
 extern crate zmq_futures;
 
+use std::io;
 use std::time::Duration;
 
 use futures::Stream;
 use tokio_core::reactor::{Core, Interval};
 use zmq_futures::zpub::Pub;
+
+#[derive(Debug)]
+enum Error {
+    Zmq(zmq::Error),
+    Io(io::Error),
+}
+
+impl From<zmq::Error> for Error {
+    fn from(e: zmq::Error) -> Self {
+        Error::Zmq(e)
+    }
+}
+
+impl From<io::Error> for Error {
+    fn from(e: io::Error) -> Self {
+        Error::Io(e)
+    }
+}
 
 fn main() {
     let mut core = Core::new().unwrap();
@@ -36,12 +55,12 @@ fn main() {
 
     let producer = Interval::new(Duration::from_secs(1), &core.handle())
         .unwrap()
-        .map_err(|_| ())
+        .map_err(Error::from)
         .and_then(|_| {
             println!("Sending 'Hello'");
-            zmq::Message::from_slice("Hello".as_bytes()).map_err(|_| ())
+            zmq::Message::from_slice("Hello".as_bytes()).map_err(Error::from)
         })
-        .forward(conn.sink());
+        .forward(conn.sink::<Error>());
 
     core.run(producer).unwrap();
 }

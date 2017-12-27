@@ -34,11 +34,14 @@ impl Push {
         PushBuilder::new()
     }
 
-    pub fn send(&self, msg: zmq::Message) -> impl Future<Item = (), Error = ()> {
+    pub fn send(&self, msg: zmq::Message) -> impl Future<Item = (), Error = zmq::Error> {
         ZmqRequest::new(Rc::clone(&self.sock), msg)
     }
 
-    pub fn sink<H>(&self) -> ZmqSink<H> {
+    pub fn sink<E>(&self) -> ZmqSink<E>
+    where
+        E: From<zmq::Error>,
+    {
         ZmqSink::new(Rc::clone(&self.sock))
     }
 }

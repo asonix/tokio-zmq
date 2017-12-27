@@ -30,41 +30,35 @@ pub struct ZmqRequest {
 }
 
 impl ZmqRequest {
-    pub fn new(socket: Rc<zmq::Socket>, msg: zmq::Message) -> impl Future<Item = (), Error = ()> {
+    pub fn new(
+        socket: Rc<zmq::Socket>,
+        msg: zmq::Message,
+    ) -> impl Future<Item = (), Error = zmq::Error> {
         ZmqRequest {
             socket: socket,
             msg: Some(msg),
         }
     }
 
-    fn send(&mut self) -> Async<()> {
+    fn send(&mut self) -> Result<Async<()>, zmq::Error> {
         let msg = match self.msg.take() {
             Some(msg) => msg,
-            None => return Async::Ready(()),
+            None => return Ok(Async::Ready(())),
         };
 
         let mut items = [self.socket.as_poll_item(zmq::POLLOUT)];
 
-        match zmq::poll(&mut items, 1) {
-            Ok(_) => (),
-            Err(err) => {
-                println!("Error in poll: {}", err);
-                task::current().notify();
-                return Async::NotReady;
-            }
-        };
+        zmq::poll(&mut items, 1)?;
 
         for item in items.iter() {
             if item.is_writable() {
                 match self.socket.send(&msg, zmq::DONTWAIT) {
                     Ok(_) => {
-                        return Async::Ready(());
+                        return Ok(Async::Ready(()));
                     }
-                    Err(zmq::Error::EAGAIN) => {
-                        println!("Socket full, wait");
-                    }
+                    Err(zmq::Error::EAGAIN) => (),
                     Err(err) => {
-                        println!("Error checking item: {}", err);
+                        return Err(err);
                     }
                 }
 
@@ -75,16 +69,16 @@ impl ZmqRequest {
         }
 
         task::current().notify();
-        Async::NotReady
+        Ok(Async::NotReady)
     }
 }
 
 impl Future for ZmqRequest {
     type Item = ();
-    type Error = ();
+    type Error = zmq::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        Ok(self.send())
+        self.send()
     }
 }
 
@@ -96,22 +90,15 @@ impl ZmqResponse {
     pub fn new(
         socket: Rc<zmq::Socket>,
         msg: zmq::Message,
-    ) -> impl Future<Item = zmq::Message, Error = ()> {
+    ) -> impl Future<Item = zmq::Message, Error = zmq::Error> {
         ZmqRequest::new(Rc::clone(&socket), msg).and_then(|_| ZmqResponse { socket: socket })
     }
 
-    fn receive(&mut self) -> Async<zmq::Message> {
+    fn receive(&mut self) -> Result<Async<zmq::Message>, zmq::Error> {
         let mut items = [self.socket.as_poll_item(zmq::POLLIN)];
 
         // Don't block waiting for an item to become ready
-        match zmq::poll(&mut items, 1) {
-            Ok(_) => (),
-            Err(err) => {
-                println!("Error in poll: {}", err);
-                task::current().notify();
-                return Async::NotReady;
-            }
-        };
+        zmq::poll(&mut items, 1)?;
 
         let mut msg = zmq::Message::new().unwrap();
 
@@ -119,29 +106,27 @@ impl ZmqResponse {
             if item.is_readable() {
                 match self.socket.recv(&mut msg, zmq::DONTWAIT) {
                     Ok(_) => {
-                        return Async::Ready(msg);
+                        return Ok(Async::Ready(msg));
                     }
-                    Err(zmq::Error::EAGAIN) => {
-                        println!("Socket not ready, wait");
-                    }
+                    Err(zmq::Error::EAGAIN) => (),
                     Err(err) => {
-                        println!("Error checking item: {}", err);
+                        return Err(err);
                     }
                 }
             }
         }
 
         task::current().notify();
-        Async::NotReady
+        Ok(Async::NotReady)
     }
 }
 
 impl Future for ZmqResponse {
     type Item = zmq::Message;
-    type Error = ();
+    type Error = zmq::Error;
 
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        Ok(self.receive())
+        self.receive()
     }
 }

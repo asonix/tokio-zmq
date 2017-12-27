@@ -22,10 +22,30 @@ extern crate tokio_core;
 extern crate zmq;
 extern crate zmq_futures;
 
+use std::io;
+
 use futures::Stream;
 use tokio_core::reactor::Core;
 use zmq_futures::push::Push;
 use zmq_futures::pull::Pull;
+
+#[derive(Debug)]
+enum Error {
+    Zmq(zmq::Error),
+    Io(io::Error),
+}
+
+impl From<zmq::Error> for Error {
+    fn from(e: zmq::Error) -> Self {
+        Error::Zmq(e)
+    }
+}
+
+impl From<io::Error> for Error {
+    fn from(e: io::Error) -> Self {
+        Error::Io(e)
+    }
+}
 
 fn main() {
     let mut core = Core::new().unwrap();
@@ -34,12 +54,13 @@ fn main() {
 
     let process = stream
         .stream()
+        .map_err(Error::from)
         .and_then(|msg| {
             let msg = msg.as_str().unwrap();
             println!("msg: '{}'", msg);
-            zmq::Message::from_slice(msg.as_bytes()).map_err(|_| ())
+            zmq::Message::from_slice(msg.as_bytes()).map_err(Error::from)
         })
-        .forward(sink.sink());
+        .forward(sink.sink::<Error>());
 
     core.run(process).unwrap();
 }
