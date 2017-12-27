@@ -1,0 +1,12 @@
+[package]
+name = "zmq-futures"
+description = "Provides Futures abstraction for ZeroMQ"
+repository = "https://github.com/asonix/zmq-futures"
+version = "0.1.0"
+authors = ["Riley Trautman <asonix.dev@gmail.com>"]
+license = "GPL-3.0"
+
+[dependencies]
+zmq = "0.8"
+futures = "0.1"
+tokio-core = "0.1"
