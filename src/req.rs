@@ -38,23 +38,23 @@ impl ReqBuilder {
         }
     }
 
-    pub fn connect(self, addr: &str) -> zmq::Result<ReqClient> {
+    pub fn connect(self, addr: &str) -> zmq::Result<Req> {
         match self {
             ReqBuilder::Sock(sock) => {
                 sock.connect(addr)?;
 
-                Ok(ReqClient { sock: sock })
+                Ok(Req { sock: sock })
             }
             ReqBuilder::Fail(e) => Err(e),
         }
     }
 }
 
-pub struct ReqClient {
+pub struct Req {
     sock: Rc<zmq::Socket>,
 }
 
-impl ReqClient {
+impl Req {
     pub fn new() -> ReqBuilder {
         ReqBuilder::new()
     }

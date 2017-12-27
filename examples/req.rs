@@ -26,18 +26,17 @@ use tokio_core::reactor::Core;
 use futures::stream::iter_ok;
 use futures::{Future, Stream};
 
-use zmq_futures::async::req::ReqBuilder;
+use zmq_futures::req::Req;
 
 fn main() {
-    let zmq_async = ReqBuilder::new().connect("tcp://localhost:5560").unwrap();
+    let zmq = Req::new().connect("tcp://localhost:5560").unwrap();
 
     let mut core = Core::new().unwrap();
 
     let stream = iter_ok(5..10)
         .and_then(|req| {
             println!("sending: {}", req);
-            zmq_async
-                .send(zmq::Message::from_slice("Hello".as_bytes()).unwrap())
+            zmq.send(zmq::Message::from_slice("Hello".as_bytes()).unwrap())
                 .map(move |message| (req, message))
         })
         .for_each(|(req, message)| {

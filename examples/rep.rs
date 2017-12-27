@@ -24,7 +24,7 @@ extern crate zmq_futures;
 
 use futures::Future;
 use tokio_core::reactor::Core;
-use zmq_futures::async::rep::{RepBuilder, RepHandler};
+use zmq_futures::rep::{RepBuilder, RepHandler};
 
 #[derive(Debug)]
 pub enum Error {

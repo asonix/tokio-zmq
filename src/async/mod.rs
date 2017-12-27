@@ -20,9 +20,3 @@
 pub mod stream;
 pub mod sink;
 pub mod future;
-pub mod rep;
-pub mod req;
-pub mod zpub;
-pub mod sub;
-pub mod push;
-pub mod pull;

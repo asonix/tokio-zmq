@@ -23,6 +23,9 @@ extern crate zmq;
 extern crate futures;
 
 pub mod async;
-mod zmq_sync;
-
-pub use self::zmq_sync::{ZmqReceiver, ZmqReceiverBuilder, ZmqResponder, ZmqREP};
+pub mod rep;
+pub mod req;
+pub mod zpub;
+pub mod sub;
+pub mod push;
+pub mod pull;
