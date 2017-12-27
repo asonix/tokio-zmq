@@ -22,18 +22,28 @@ extern crate tokio_core;
 extern crate zmq;
 extern crate zmq_futures;
 
-use futures::Future;
+use std::io;
+
+use futures::{Future, IntoFuture};
 use tokio_core::reactor::Core;
 use zmq_futures::rep::{RepBuilder, RepHandler};
 
 #[derive(Debug)]
 pub enum Error {
     Zmq(zmq::Error),
+    Io(io::Error),
+    StringRepresentation,
 }
 
 impl From<zmq::Error> for Error {
     fn from(e: zmq::Error) -> Self {
         Error::Zmq(e)
+    }
+}
+
+impl From<io::Error> for Error {
+    fn from(e: io::Error) -> Self {
+        Error::Io(e)
     }
 }
 
@@ -48,7 +58,17 @@ impl RepHandler for Echo {
     type Future = Box<Future<Item = Self::Response, Error = Self::Error>>;
 
     fn call(&self, req: Self::Request) -> Self::Future {
-        Box::new(futures::future::ok(req))
+        let res = req.as_str()
+            .ok_or(Error::StringRepresentation)
+            .map(|msg| {
+                println!("Received: '{}'", msg);
+                msg
+            })
+            .and_then(|msg| {
+                zmq::Message::from_slice(msg.as_bytes()).map_err(Error::from)
+            });
+
+        Box::new(res.into_future())
     }
 }
 
