@@ -67,14 +67,11 @@ impl Handler for Echo {
     type Future = Box<Future<Item = Self::Response, Error = Self::Error>>;
 
     fn call(&self, req: Self::Request) -> Self::Future {
-        let res = req.map(|msg| msg.to_vec())
-            .concat2()
-            .map_err(Error::from)
-            .and_then(|msg| {
-                let msg = String::from_utf8(msg)?;
-                println!("Received: '{}'", msg);
-                Ok(zmq::Message::from_slice(msg.as_bytes())?.into())
-            });
+        let res = req.map(|msg| msg.to_vec()).concat2().and_then(|msg| {
+            let msg = String::from_utf8(msg)?;
+            println!("Received: '{}'", msg);
+            Ok(zmq::Message::from_slice(msg.as_bytes())?.into())
+        });
 
         Box::new(res)
     }
