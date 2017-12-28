@@ -17,28 +17,8 @@
  * along with ZeroMQ Futures.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-extern crate futures;
-extern crate tokio_core;
-extern crate zmq;
-extern crate zmq_futures;
+mod envelope;
+mod singleton;
 
-use futures::Stream;
-use tokio_core::reactor::Core;
-use zmq_futures::pull::Pull;
-use zmq_futures::StreamSocket;
-
-fn main() {
-    let mut core = Core::new().unwrap();
-    let conn = Pull::new().bind("tcp://*:5558").build().unwrap();
-
-    let process = conn.stream::<zmq::Error>()
-        .and_then(|msg| msg.map(|msg| msg.to_vec()).concat2())
-        .for_each(|msg| {
-            let msg = String::from_utf8(msg).unwrap();
-            println!("msg: '{}'", msg);
-
-            Ok(())
-        });
-
-    core.run(process).unwrap();
-}
+pub use self::envelope::Envelope;
+pub use self::singleton::Singleton;

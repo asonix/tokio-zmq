@@ -24,6 +24,8 @@ extern crate zmq;
 extern crate zmq_futures_derive;
 extern crate futures;
 
+pub mod service;
+
 pub mod async;
 pub mod rep;
 pub mod req;
@@ -32,65 +34,18 @@ pub mod sub;
 pub mod push;
 pub mod pull;
 
+pub use self::rep::Rep;
+pub use self::req::Req;
+pub use self::zpub::Pub;
+pub use self::sub::Sub;
+pub use self::push::Push;
+pub use self::pull::Pull;
+pub use self::service::{Handler, Runner};
+
+use self::async::{ZmqRequest, ZmqResponse, ZmqSink, ZmqStream};
+use futures::Stream;
+
 use std::rc::Rc;
-use std::fmt::Debug;
-
-use futures::{Future, Stream};
-
-use async::{MsgStream, ZmqRequest, ZmqResponse, ZmqSink, ZmqStream};
-
-pub trait Handler: Clone {
-    type Request: From<MsgStream>;
-    type Response: Into<zmq::Message>;
-    type Error: From<zmq::Error> + Sized + Debug;
-
-    type Future: Future<Item = Self::Response, Error = Self::Error>;
-
-    fn call(&self, req: Self::Request) -> Self::Future;
-}
-
-pub struct Runner<'a, P, C, H>
-where
-    P: StreamSocket + 'a,
-    C: SinkSocket + 'a,
-    H: Handler,
-{
-    stream: &'a P,
-    sink: &'a C,
-    handler: H,
-}
-
-impl<'a, P, C, H> Runner<'a, P, C, H>
-where
-    P: StreamSocket + 'a,
-    C: SinkSocket + 'a,
-    H: Handler,
-{
-    pub fn new(stream: &'a P, sink: &'a C, handler: H) -> Self {
-        Runner {
-            stream,
-            sink,
-            handler,
-        }
-    }
-
-    pub fn run(
-        &self,
-    ) -> impl Future<
-        Item = (impl Stream<Item = zmq::Message, Error = H::Error>, ZmqSink<H::Error>),
-        Error = H::Error,
-    > {
-        let handler = self.handler.clone();
-
-        self.stream
-            .stream()
-            .map_err(H::Error::from)
-            .and_then(move |msg| handler.call(msg.into()))
-            .map(|msg| msg.into())
-            .map_err(|e| e.into())
-            .forward(self.sink.sink::<H::Error>())
-    }
-}
 
 pub trait ZmqSocket {
     fn socket(&self) -> Rc<zmq::Socket>;
@@ -101,7 +56,10 @@ pub trait StreamSocket: ZmqSocket {
         ZmqResponse::new(self.socket())
     }
 
-    fn stream(&self) -> async::ZmqStream {
+    fn stream<E>(&self) -> async::ZmqStream<E>
+    where
+        E: From<zmq::Error>,
+    {
         ZmqStream::new(self.socket())
     }
 }
@@ -111,8 +69,9 @@ pub trait SinkSocket: ZmqSocket {
         ZmqRequest::new(self.socket(), msg)
     }
 
-    fn sink<E>(&self) -> async::ZmqSink<E>
+    fn sink<S, E>(&self) -> async::ZmqSink<S, E>
     where
+        S: Stream<Item = zmq::Message, Error = E>,
         E: From<zmq::Error>,
     {
         ZmqSink::new(self.socket())

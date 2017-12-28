@@ -22,36 +22,60 @@ use std::fmt;
 use std::marker::PhantomData;
 
 use zmq;
-use futures::{Async, AsyncSink, Poll, Sink, StartSend};
+use futures::{Async, AsyncSink, Poll, Sink, StartSend, Stream};
 
-#[derive(Clone)]
-pub struct ZmqSink<E>
+#[derive(PartialEq)]
+enum MsgPlace {
+    NthMsg,
+    LastMsg,
+}
+
+pub struct ZmqSink<S, E>
 where
+    S: Stream<Item = zmq::Message, Error = E>,
     E: From<zmq::Error>,
 {
     socket: Rc<zmq::Socket>,
+    current_msg: Option<zmq::Message>,
+    next_msg: Option<zmq::Message>,
+    stream: Option<S>,
     phantom: PhantomData<E>,
 }
 
-impl<E> ZmqSink<E>
+impl<S, E> ZmqSink<S, E>
 where
+    S: Stream<Item = zmq::Message, Error = E>,
     E: From<zmq::Error>,
 {
     pub fn new(sock: Rc<zmq::Socket>) -> Self {
         ZmqSink {
             socket: sock,
+            current_msg: None,
+            next_msg: None,
+            stream: None,
             phantom: PhantomData,
         }
     }
 
-    fn send_message(&mut self, msg: zmq::Message) -> Result<AsyncSink<zmq::Message>, zmq::Error> {
+    fn send_message(
+        &mut self,
+        msg: zmq::Message,
+        place: MsgPlace,
+    ) -> Result<AsyncSink<zmq::Message>, zmq::Error> {
         let mut items = [self.socket.as_poll_item(zmq::POLLOUT)];
 
         zmq::poll(&mut items, 1)?;
 
+        let flags = zmq::DONTWAIT |
+            if place == MsgPlace::LastMsg {
+                0
+            } else {
+                zmq::SNDMORE
+            };
+
         for item in items.iter() {
             if item.is_writable() {
-                match self.socket.send(&msg, zmq::DONTWAIT) {
+                match self.socket.send(&msg, flags) {
                     Ok(_) => {
                         return Ok(AsyncSink::Ready);
                     }
@@ -68,31 +92,87 @@ where
         Ok(AsyncSink::NotReady(msg))
     }
 
-    fn flush(&mut self) -> Result<Async<()>, zmq::Error> {
-        let mut items = [self.socket.as_poll_item(zmq::POLLOUT)];
+    fn flush(&mut self) -> Result<Async<()>, E> {
+        if let Some(current_msg) = self.current_msg.take() {
+            let msg_place = if self.next_msg.is_some() {
+                MsgPlace::NthMsg
+            } else {
+                MsgPlace::LastMsg
+            };
 
-        zmq::poll(&mut items, 1).map(|_| Async::Ready(()))
+            match self.send_message(current_msg, msg_place)? {
+                AsyncSink::Ready => (),
+                AsyncSink::NotReady(current_msg) => {
+                    self.current_msg = Some(current_msg);
+                    return Ok(Async::NotReady);
+                }
+            }
+        }
+
+        if self.next_msg.is_some() {
+            self.current_msg = self.next_msg.take();
+        }
+
+        let item = {
+            let stream = match self.stream {
+                Some(ref mut stream) => stream,
+                None => {
+                    return if self.current_msg.is_some() {
+                        Ok(Async::NotReady)
+                    } else {
+                        Ok(Async::Ready(()))
+                    };
+                }
+            };
+
+            match stream.poll()? {
+                Async::Ready(item) => item,
+                Async::NotReady => return Ok(Async::NotReady),
+            }
+        };
+
+        match item {
+            Some(msg) => {
+                self.next_msg = Some(msg);
+                Ok(Async::NotReady)
+            }
+            None => {
+                self.stream = None;
+                Ok(Async::NotReady)
+            }
+        }
     }
 }
 
-impl<E> Sink for ZmqSink<E>
+impl<S, E> Sink for ZmqSink<S, E>
 where
+    S: Stream<Item = zmq::Message, Error = E>,
     E: From<zmq::Error>,
 {
-    type SinkItem = zmq::Message;
+    type SinkItem = S;
     type SinkError = E;
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        Ok(self.send_message(item)?)
+        if self.stream.is_none() && self.next_msg.is_none() && self.current_msg.is_none() {
+            self.stream = Some(item);
+
+            Ok(AsyncSink::Ready)
+        } else {
+            match self.flush()? {
+                Async::Ready(()) => Ok(AsyncSink::Ready),
+                Async::NotReady => Ok(AsyncSink::NotReady(item)),
+            }
+        }
     }
 
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        Ok(self.flush()?)
+        self.flush()
     }
 }
 
-impl<E> fmt::Debug for ZmqSink<E>
+impl<S, E> fmt::Debug for ZmqSink<S, E>
 where
+    S: Stream<Item = zmq::Message, Error = E>,
     E: From<zmq::Error>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {

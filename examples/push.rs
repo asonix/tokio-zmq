@@ -28,8 +28,9 @@ use std::time::Duration;
 use futures::{Future, Stream};
 use futures::stream::iter_ok;
 use tokio_core::reactor::{Core, Interval};
-use zmq_futures::push::Push;
+use zmq_futures::Push;
 use zmq_futures::SinkSocket;
+use zmq_futures::service::response::Singleton;
 
 #[derive(Debug)]
 enum Error {
@@ -65,9 +66,13 @@ fn main() {
             .and_then(|(i, _)| {
                 println!("Sending: {}", i);
 
-                Ok(zmq::Message::from_slice(format!("{}", i).as_bytes())?)
+                let msg = format!("{}", i);
+                let msg = msg.as_bytes();
+                let msg = zmq::Message::from_slice(msg)?;
+
+                Ok(msg.into())
             })
-            .forward(workers.sink::<Error>())
+            .forward(workers.sink::<Singleton<Error>, Error>())
     });
 
     core.run(process).unwrap();

@@ -17,28 +17,31 @@
  * along with ZeroMQ Futures.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-extern crate futures;
-extern crate tokio_core;
-extern crate zmq;
-extern crate zmq_futures;
+use std::marker::PhantomData;
 
-use futures::Stream;
-use tokio_core::reactor::Core;
-use zmq_futures::pull::Pull;
-use zmq_futures::StreamSocket;
+use zmq;
+use futures::{Async, Poll, Stream, task};
 
-fn main() {
-    let mut core = Core::new().unwrap();
-    let conn = Pull::new().bind("tcp://*:5558").build().unwrap();
+pub struct Singleton<E> {
+    inner: Option<zmq::Message>,
+    phantom: PhantomData<E>,
+}
 
-    let process = conn.stream::<zmq::Error>()
-        .and_then(|msg| msg.map(|msg| msg.to_vec()).concat2())
-        .for_each(|msg| {
-            let msg = String::from_utf8(msg).unwrap();
-            println!("msg: '{}'", msg);
+impl<E> From<zmq::Message> for Singleton<E> {
+    fn from(msg: zmq::Message) -> Self {
+        Singleton {
+            inner: Some(msg),
+            phantom: PhantomData,
+        }
+    }
+}
 
-            Ok(())
-        });
+impl<E> Stream for Singleton<E> {
+    type Item = zmq::Message;
+    type Error = E;
 
-    core.run(process).unwrap();
+    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+        task::current().notify();
+        Ok(Async::Ready(self.inner.take()))
+    }
 }

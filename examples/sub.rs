@@ -35,7 +35,7 @@ fn main() {
         .filter(b"H")
         .unwrap();
 
-    let consumer = conn.stream()
+    let consumer = conn.stream::<zmq::Error>()
         .and_then(|msg| msg.map(|msg| msg.to_vec()).concat2())
         .for_each(|msg| {
             let msg = String::from_utf8(msg).unwrap();

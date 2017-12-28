@@ -27,9 +27,10 @@ use std::string::FromUtf8Error;
 
 use futures::{Future, Stream};
 use tokio_core::reactor::Core;
-use zmq_futures::push::Push;
-use zmq_futures::pull::Pull;
-use zmq_futures::async::stream::MsgStream;
+use zmq_futures::Push;
+use zmq_futures::Pull;
+use zmq_futures::async::MsgStream;
+use zmq_futures::service::response::Singleton;
 use zmq_futures::{Handler, Runner};
 
 #[derive(Debug)]
@@ -61,8 +62,8 @@ impl From<FromUtf8Error> for Error {
 pub struct PassThrough;
 
 impl Handler for PassThrough {
-    type Request = MsgStream;
-    type Response = zmq::Message;
+    type Request = MsgStream<Self::Error>;
+    type Response = Singleton<Self::Error>;
     type Error = Error;
 
     type Future = Box<Future<Item = Self::Response, Error = Self::Error>>;
@@ -74,7 +75,7 @@ impl Handler for PassThrough {
             .and_then(|msg| {
                 let msg = String::from_utf8(msg)?;
                 println!("msg: '{}'", msg);
-                Ok(zmq::Message::from_slice(msg.as_bytes())?)
+                Ok(zmq::Message::from_slice(msg.as_bytes())?.into())
             });
 
         Box::new(res)

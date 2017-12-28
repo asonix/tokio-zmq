@@ -19,22 +19,33 @@
 
 use std::rc::Rc;
 use std::fmt;
+use std::marker::PhantomData;
 
 use zmq;
 use futures::{Async, Poll, Stream};
 use futures::task;
 
 #[derive(Clone)]
-pub struct MsgStream {
+pub struct MsgStream<E>
+where
+    E: From<zmq::Error>,
+{
     socket: Option<Rc<zmq::Socket>>,
+    phantom: PhantomData<E>,
 }
 
-impl MsgStream {
+impl<E> MsgStream<E>
+where
+    E: From<zmq::Error>,
+{
     pub fn new(sock: Rc<zmq::Socket>) -> Self {
-        MsgStream { socket: Some(sock) }
+        MsgStream {
+            socket: Some(sock),
+            phantom: PhantomData,
+        }
     }
 
-    fn next_message(&mut self) -> Result<Async<Option<zmq::Message>>, zmq::Error> {
+    fn next_message(&mut self) -> Result<Async<Option<zmq::Message>>, E> {
         let socket = match self.socket.take() {
             Some(socket) => socket,
             None => return Ok(Async::Ready(None)),
@@ -59,7 +70,7 @@ impl MsgStream {
                     }
                     Err(zmq::Error::EAGAIN) => (),
                     Err(err) => {
-                        return Err(err);
+                        return Err(err.into());
                     }
                 }
             }
@@ -72,9 +83,12 @@ impl MsgStream {
     }
 }
 
-impl Stream for MsgStream {
+impl<E> Stream for MsgStream<E>
+where
+    E: From<zmq::Error>,
+{
     type Item = zmq::Message;
-    type Error = zmq::Error;
+    type Error = E;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         self.next_message()
@@ -82,30 +96,46 @@ impl Stream for MsgStream {
 }
 
 #[derive(Clone)]
-pub struct ZmqStream {
+pub struct ZmqStream<E>
+where
+    E: From<zmq::Error>,
+{
     socket: Rc<zmq::Socket>,
+    phantom: PhantomData<E>,
 }
 
-impl ZmqStream {
+impl<E> ZmqStream<E>
+where
+    E: From<zmq::Error>,
+{
     pub fn new(sock: Rc<zmq::Socket>) -> Self {
-        ZmqStream { socket: sock }
+        ZmqStream {
+            socket: sock,
+            phantom: PhantomData,
+        }
     }
 
-    fn next_message(&self) -> Async<Option<MsgStream>> {
+    fn next_message(&self) -> Async<Option<MsgStream<E>>> {
         Async::Ready(Some(MsgStream::new(Rc::clone(&self.socket))))
     }
 }
 
-impl Stream for ZmqStream {
-    type Item = MsgStream;
-    type Error = zmq::Error;
+impl<E> Stream for ZmqStream<E>
+where
+    E: From<zmq::Error>,
+{
+    type Item = MsgStream<E>;
+    type Error = E;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         Ok(self.next_message())
     }
 }
 
-impl fmt::Debug for ZmqStream {
+impl<E> fmt::Debug for ZmqStream<E>
+where
+    E: From<zmq::Error>,
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         write!(f, "ZmqStream")
     }
