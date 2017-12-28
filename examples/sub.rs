@@ -30,7 +30,7 @@ fn main() {
     let mut core = Core::new().unwrap();
     let conn = Sub::new()
         .connect("tcp://localhost:5556")
-        .filter("H".as_bytes())
+        .filter(b"H")
         .unwrap();
 
     let consumer = conn.stream()

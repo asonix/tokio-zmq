@@ -58,7 +58,7 @@ fn main() {
         .map_err(Error::from)
         .and_then(|_| {
             println!("Sending 'Hello'");
-            zmq::Message::from_slice("Hello".as_bytes()).map_err(Error::from)
+            zmq::Message::from_slice(b"Hello").map_err(Error::from)
         })
         .forward(conn.sink::<Error>());
 

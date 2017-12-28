@@ -36,8 +36,9 @@ fn main() {
     let stream = iter_ok(5..10)
         .and_then(|req| {
             println!("sending: {}", req);
-            zmq.send(zmq::Message::from_slice("Hello".as_bytes()).unwrap())
-                .map(move |message| (req, message))
+            zmq.send(zmq::Message::from_slice(b"Hello").unwrap()).map(
+                move |message| (req, message),
+            )
         })
         .for_each(|(req, message)| {
             println!("Received reply {} {}", req, message.as_str().unwrap());
