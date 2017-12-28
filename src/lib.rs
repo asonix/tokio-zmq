@@ -20,12 +20,58 @@
 #![feature(conservative_impl_trait)]
 
 extern crate zmq;
+#[macro_use]
+extern crate zmq_futures_derive;
 extern crate futures;
 
 pub mod async;
 pub mod rep;
-pub mod req;
-pub mod zpub;
-pub mod sub;
-pub mod push;
-pub mod pull;
+// pub mod req;
+// pub mod zpub;
+// pub mod sub;
+// pub mod push;
+// pub mod pull;
+
+use std::rc::Rc;
+use std::fmt::Debug;
+
+use futures::Future;
+
+use async::{MsgStream, ZmqRequest, ZmqResponse, ZmqSink, ZmqStream};
+
+pub trait Handler: Clone {
+    type Request: From<MsgStream>;
+    type Response: Into<zmq::Message>;
+    type Error: From<zmq::Error> + Sized + Debug;
+
+    type Future: Future<Item = Self::Response, Error = Self::Error>;
+
+    fn call(&self, req: Self::Request) -> Self::Future;
+}
+
+pub trait ZmqSocket {
+    fn socket(&self) -> Rc<zmq::Socket>;
+}
+
+pub trait StreamSocket: ZmqSocket {
+    fn recv(&self) -> async::ZmqResponse {
+        ZmqResponse::new(self.socket())
+    }
+
+    fn stream(&self) -> async::ZmqStream {
+        ZmqStream::new(self.socket())
+    }
+}
+
+pub trait SinkSocket<E>: ZmqSocket
+where
+    E: From<zmq::Error>,
+{
+    fn send(&self, msg: zmq::Message) -> ZmqRequest {
+        ZmqRequest::new(self.socket(), msg)
+    }
+
+    fn sink(&self) -> async::ZmqSink<E> {
+        ZmqSink::new(self.socket())
+    }
+}

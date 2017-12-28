@@ -30,10 +30,7 @@ pub struct ZmqRequest {
 }
 
 impl ZmqRequest {
-    pub fn new(
-        socket: Rc<zmq::Socket>,
-        msg: zmq::Message,
-    ) -> impl Future<Item = (), Error = zmq::Error> {
+    pub fn new(socket: Rc<zmq::Socket>, msg: zmq::Message) -> ZmqRequest {
         ZmqRequest {
             socket: socket,
             msg: Some(msg),
@@ -87,7 +84,7 @@ pub struct ZmqResponse {
 }
 
 impl ZmqResponse {
-    pub fn new(socket: Rc<zmq::Socket>) -> impl Future<Item = zmq::Message, Error = zmq::Error> {
+    pub fn new(socket: Rc<zmq::Socket>) -> ZmqResponse {
         ZmqResponse { socket: socket }
     }
 

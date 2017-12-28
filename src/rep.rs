@@ -18,90 +18,20 @@
  */
 
 use std::rc::Rc;
-use std::fmt::Debug;
-
-use async::stream::{MsgStream, ZmqStream};
-use async::sink::ZmqSink;
 
 use zmq;
-use futures::{Future, Stream};
 
-pub trait RepHandler: Clone {
-    type Request: From<MsgStream>;
-    type Response: Into<zmq::Message>;
-    type Error: From<zmq::Error> + Sized + Debug;
-
-    type Future: Future<Item = Self::Response, Error = Self::Error>;
-
-    fn call(&self, req: Self::Request) -> Self::Future;
-}
-
-pub enum RepBuilder {
-    Sock(Rc<zmq::Socket>),
-    Fail(zmq::Error),
-}
-
-impl RepBuilder {
-    pub fn new() -> Self {
-        let context = zmq::Context::new();
-
-        match context.socket(zmq::REP) {
-            Ok(sock) => RepBuilder::Sock(Rc::new(sock)),
-            Err(e) => RepBuilder::Fail(e),
-        }
-    }
-
-    pub fn handler<H>(self, handler: H) -> RepServerBuilder<H>
-    where
-        H: RepHandler,
-    {
-        match self {
-            RepBuilder::Sock(sock) => RepServerBuilder::Server { sock, handler },
-            RepBuilder::Fail(e) => RepServerBuilder::Fail(e),
-        }
-    }
-}
-
-pub enum RepServerBuilder<H>
-where
-    H: RepHandler,
-{
-    Server { sock: Rc<zmq::Socket>, handler: H },
-    Fail(zmq::Error),
-}
-
-impl<H> RepServerBuilder<H>
-where
-    H: RepHandler,
-{
-    pub fn bind(self, addr: &str) -> zmq::Result<RepServer<H>> {
-        match self {
-            RepServerBuilder::Server { sock, handler } => {
-                sock.bind(addr)?;
-
-                Ok(RepServer { sock, handler })
-            }
-            RepServerBuilder::Fail(e) => Err(e),
-        }
-    }
-}
-
-pub struct RepServer<H>
-where
-    H: RepHandler,
-{
+#[derive(ZmqSocket, SinkSocket, StreamSocket, Builder)]
+pub struct Rep {
     sock: Rc<zmq::Socket>,
-    handler: H,
 }
 
-impl<H> RepServer<H>
-where
-    H: RepHandler,
-{
+impl Rep {
     pub fn new() -> RepBuilder {
         RepBuilder::new()
     }
 
+    /*
     pub fn runner(
         &self,
     ) -> impl Future<
@@ -117,12 +47,5 @@ where
             .map_err(|e| e.into())
             .forward(self.sink())
     }
-
-    pub fn stream(&self) -> ZmqStream {
-        ZmqStream::new(Rc::clone(&self.sock))
-    }
-
-    pub fn sink(&self) -> ZmqSink<H::Error> {
-        ZmqSink::new(Rc::clone(&self.sock))
-    }
+    */
 }

@@ -10,3 +10,4 @@ license = "GPL-3.0"
 zmq = "0.8"
 futures = "0.1"
 tokio-core = "0.1"
+zmq-futures-derive = { path = "zmq-futures-derive" }
