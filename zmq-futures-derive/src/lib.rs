@@ -8,6 +8,114 @@ extern crate syn;
 #[macro_use]
 extern crate quote;
 
+#[proc_macro_derive(CustomBuilder)]
+pub fn custom_builder(input: TokenStream) -> TokenStream {
+    let source = input.to_string();
+    let ast = syn::parse_derive_input(&source).unwrap();
+    let expanded = expand_custom_builder(&ast);
+    quote!(#expanded).to_string().parse().unwrap()
+}
+
+fn expand_custom_builder(ast: &syn::DeriveInput) -> quote::Tokens {
+    let name = &ast.ident;
+
+    let socket_type = syn::Ident::from(format!("zmq::{}", format!("{}", name).to_uppercase()));
+
+    let builder_name = syn::Ident::from(format!("{}Builder", name));
+    let bind_builder_name = syn::Ident::from(format!("{}BindBuilder", name));
+    let connect_builder_name = syn::Ident::from(format!("{}ConnectBuilder", name));
+
+    let custom_builder_name = syn::Ident::from(format!("{}CustomBuilder", name));
+
+    quote! {
+        pub enum #builder_name {
+            Sock(Rc<zmq::Socket>),
+            Fail(zmq::Error),
+        }
+
+        impl #builder_name {
+            pub fn new() -> Self {
+                let ctx = zmq::Context::new();
+
+                match ctx.socket(#socket_type) {
+                    Ok(sock) => #builder_name::Sock(Rc::new(sock)),
+                    Err(e) => #builder_name::Fail(e),
+                }
+            }
+
+            pub fn bind(self, addr: &str) -> #bind_builder_name {
+                match self {
+                    #builder_name::Sock(sock) => {
+                        #bind_builder_name::Sock(sock).bind(addr)
+                    }
+                    #builder_name::Fail(e) => #bind_builder_name::Fail(e)
+                }
+            }
+
+            pub fn connect(self, addr: &str) -> #connect_builder_name {
+                match self {
+                    #builder_name::Sock(sock) => {
+                        #connect_builder_name::Sock(sock).connect(addr)
+                    }
+                    #builder_name::Fail(e) => #connect_builder_name::Fail(e)
+                }
+            }
+        }
+
+        pub enum #bind_builder_name {
+            Sock(Rc<zmq::Socket>),
+            Fail(zmq::Error),
+        }
+
+        impl #bind_builder_name {
+            pub fn bind(self, addr: &str) -> Self {
+                match self {
+                    #bind_builder_name::Sock(sock) => {
+                        match sock.bind(addr) {
+                            Ok(_) => #bind_builder_name::Sock(sock),
+                            Err(e) => #bind_builder_name::Fail(e),
+                        }
+                    }
+                    #bind_builder_name::Fail(e) => #bind_builder_name::Fail(e)
+                }
+            }
+
+            pub fn more(self) -> #custom_builder_name {
+                match self {
+                    #bind_builder_name::Sock(sock) => #custom_builder_name::Sock(sock),
+                    #bind_builder_name::Fail(e) => #custom_builder_name::Fail(e),
+                }
+            }
+        }
+
+        pub enum #connect_builder_name {
+            Sock(Rc<zmq::Socket>),
+            Fail(zmq::Error),
+        }
+
+        impl #connect_builder_name {
+            pub fn connect(self, addr: &str) -> Self {
+                match self {
+                    #connect_builder_name::Sock(sock) => {
+                        match sock.connect(addr) {
+                            Ok(_) => #connect_builder_name::Sock(sock),
+                            Err(e) => #connect_builder_name::Fail(e),
+                        }
+                    }
+                    #connect_builder_name::Fail(e) => #connect_builder_name::Fail(e)
+                }
+            }
+
+            pub fn more(self) -> #custom_builder_name {
+                match self {
+                    #connect_builder_name::Sock(sock) => #custom_builder_name::Sock(sock),
+                    #connect_builder_name::Fail(e) => #custom_builder_name::Fail(e),
+                }
+            }
+        }
+    }
+}
+
 #[proc_macro_derive(Builder)]
 pub fn builder(input: TokenStream) -> TokenStream {
     let source = input.to_string();
@@ -124,9 +232,10 @@ pub fn sink_socket(input: TokenStream) -> TokenStream {
 
 fn expand_sink_socket(ast: &syn::DeriveInput) -> quote::Tokens {
     let name = &ast.ident;
+    let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
 
     quote! {
-        impl<E: From<zmq::Error>> ::SinkSocket<E> for #name {}
+        impl #impl_generics ::SinkSocket for #name #ty_generics #where_clause {}
     }
 }
 

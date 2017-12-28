@@ -27,7 +27,8 @@ use std::string::FromUtf8Error;
 
 use futures::{Future, Stream};
 use tokio_core::reactor::Core;
-use zmq_futures::rep::{RepBuilder, RepHandler};
+use zmq_futures::{Handler, Runner};
+use zmq_futures::rep::Rep;
 use zmq_futures::async::stream::MsgStream;
 
 #[derive(Debug)]
@@ -58,7 +59,7 @@ impl From<FromUtf8Error> for Error {
 #[derive(Clone)]
 pub struct Echo;
 
-impl RepHandler for Echo {
+impl Handler for Echo {
     type Request = MsgStream;
     type Response = zmq::Message;
     type Error = Error;
@@ -70,15 +71,9 @@ impl RepHandler for Echo {
             .concat2()
             .map_err(Error::from)
             .and_then(|msg| {
-                String::from_utf8(msg)
-                    .map_err(Error::from)
-                    .map(|msg| {
-                        println!("Received: '{}'", msg);
-                        msg
-                    })
-                    .and_then(|msg| {
-                        zmq::Message::from_slice(msg.as_bytes()).map_err(Error::from)
-                    })
+                let msg = String::from_utf8(msg)?;
+                println!("Received: '{}'", msg);
+                Ok(zmq::Message::from_slice(msg.as_bytes())?)
             });
 
         Box::new(res)
@@ -87,12 +82,11 @@ impl RepHandler for Echo {
 
 fn main() {
     let mut core = Core::new().unwrap();
-    let zmq = RepBuilder::new()
-        .handler(Echo {})
-        .bind("tcp://*:5560")
-        .unwrap();
+    let zmq = Rep::new().bind("tcp://*:5560").build().unwrap();
+
+    let runner = Runner::new(&zmq, &zmq, Echo);
 
     println!("Got zmq");
 
-    core.run(zmq.runner()).unwrap();
+    core.run(runner.run()).unwrap();
 }

@@ -29,6 +29,7 @@ use futures::{Future, Stream};
 use tokio_core::reactor::Core;
 use zmq_futures::push::Push;
 use zmq_futures::pull::Pull;
+use zmq_futures::{SinkSocket, StreamSocket};
 
 #[derive(Debug)]
 enum Error {
@@ -57,8 +58,8 @@ impl From<FromUtf8Error> for Error {
 
 fn main() {
     let mut core = Core::new().unwrap();
-    let stream = Pull::new().connect("tcp://localhost:5557").unwrap();
-    let sink = Push::new().connect("tcp://localhost:5558").unwrap();
+    let stream = Pull::new().connect("tcp://localhost:5557").build().unwrap();
+    let sink = Push::new().connect("tcp://localhost:5558").build().unwrap();
 
     let process = stream
         .stream()

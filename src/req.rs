@@ -19,37 +19,12 @@
 
 use std::rc::Rc;
 
-use async::future::{ZmqRequest, ZmqResponse};
-
 use zmq;
 use futures::Future;
 
-pub enum ReqBuilder {
-    Sock(Rc<zmq::Socket>),
-    Fail(zmq::Error),
-}
+use super::{SinkSocket, StreamSocket};
 
-impl ReqBuilder {
-    pub fn new() -> Self {
-        let context = zmq::Context::new();
-        match context.socket(zmq::REQ) {
-            Ok(sock) => ReqBuilder::Sock(Rc::new(sock)),
-            Err(e) => ReqBuilder::Fail(e),
-        }
-    }
-
-    pub fn connect(self, addr: &str) -> zmq::Result<Req> {
-        match self {
-            ReqBuilder::Sock(sock) => {
-                sock.connect(addr)?;
-
-                Ok(Req { sock: sock })
-            }
-            ReqBuilder::Fail(e) => Err(e),
-        }
-    }
-}
-
+#[derive(ZmqSocket, SinkSocket, StreamSocket, Builder)]
 pub struct Req {
     sock: Rc<zmq::Socket>,
 }
@@ -59,8 +34,12 @@ impl Req {
         ReqBuilder::new()
     }
 
-    pub fn send(&self, msg: zmq::Message) -> impl Future<Item = zmq::Message, Error = zmq::Error> {
-        let sock = Rc::clone(&self.sock);
-        ZmqRequest::new(Rc::clone(&self.sock), msg).and_then(|_| ZmqResponse::new(sock))
+    pub fn request(
+        &self,
+        msg: zmq::Message,
+    ) -> impl Future<Item = zmq::Message, Error = zmq::Error> {
+        let recv = self.recv();
+
+        self.send(msg).and_then(|_| recv)
     }
 }

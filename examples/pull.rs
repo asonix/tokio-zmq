@@ -25,10 +25,11 @@ extern crate zmq_futures;
 use futures::Stream;
 use tokio_core::reactor::Core;
 use zmq_futures::pull::Pull;
+use zmq_futures::StreamSocket;
 
 fn main() {
     let mut core = Core::new().unwrap();
-    let conn = Pull::new().bind("tcp://*:5558").unwrap();
+    let conn = Pull::new().bind("tcp://*:5558").build().unwrap();
 
     let process = conn.stream()
         .and_then(|msg| msg.map(|msg| msg.to_vec()).concat2())

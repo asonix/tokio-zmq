@@ -19,12 +19,9 @@
 
 use std::rc::Rc;
 
-use async::sink::ZmqSink;
-use async::future::ZmqRequest;
-
 use zmq;
-use futures::Future;
 
+#[derive(ZmqSocket, SinkSocket, StreamSocket, Builder)]
 pub struct Push {
     sock: Rc<zmq::Socket>,
 }
@@ -32,53 +29,5 @@ pub struct Push {
 impl Push {
     pub fn new() -> PushBuilder {
         PushBuilder::new()
-    }
-
-    pub fn send(&self, msg: zmq::Message) -> impl Future<Item = (), Error = zmq::Error> {
-        ZmqRequest::new(Rc::clone(&self.sock), msg)
-    }
-
-    pub fn sink<E>(&self) -> ZmqSink<E>
-    where
-        E: From<zmq::Error>,
-    {
-        ZmqSink::new(Rc::clone(&self.sock))
-    }
-}
-
-pub enum PushBuilder {
-    Sock(Rc<zmq::Socket>),
-    Fail(zmq::Error),
-}
-
-impl PushBuilder {
-    pub fn new() -> Self {
-        let context = zmq::Context::new();
-        match context.socket(zmq::PUSH) {
-            Ok(sock) => PushBuilder::Sock(Rc::new(sock)),
-            Err(e) => PushBuilder::Fail(e),
-        }
-    }
-
-    pub fn bind(self, addr: &str) -> zmq::Result<Push> {
-        match self {
-            PushBuilder::Sock(sock) => {
-                sock.bind(&addr)?;
-
-                Ok(Push { sock })
-            }
-            PushBuilder::Fail(e) => Err(e),
-        }
-    }
-
-    pub fn connect(self, addr: &str) -> zmq::Result<Push> {
-        match self {
-            PushBuilder::Sock(sock) => {
-                sock.connect(addr)?;
-
-                Ok(Push { sock })
-            }
-            PushBuilder::Fail(e) => Err(e),
-        }
     }
 }

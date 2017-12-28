@@ -25,11 +25,13 @@ extern crate zmq_futures;
 use futures::Stream;
 use tokio_core::reactor::Core;
 use zmq_futures::sub::Sub;
+use zmq_futures::StreamSocket;
 
 fn main() {
     let mut core = Core::new().unwrap();
     let conn = Sub::new()
         .connect("tcp://localhost:5556")
+        .more()
         .filter(b"H")
         .unwrap();
 

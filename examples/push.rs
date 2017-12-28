@@ -29,6 +29,7 @@ use futures::{Future, Stream};
 use futures::stream::iter_ok;
 use tokio_core::reactor::{Core, Interval};
 use zmq_futures::push::Push;
+use zmq_futures::SinkSocket;
 
 #[derive(Debug)]
 enum Error {
@@ -50,8 +51,8 @@ impl From<io::Error> for Error {
 
 fn main() {
     let mut core = Core::new().unwrap();
-    let workers = Push::new().bind("tcp://*:5557").unwrap();
-    let sink = Push::new().connect("tcp://localhost:5558").unwrap();
+    let workers = Push::new().bind("tcp://*:5557").build().unwrap();
+    let sink = Push::new().connect("tcp://localhost:5558").build().unwrap();
 
     let start = zmq::Message::from_slice(b"0").unwrap();
 

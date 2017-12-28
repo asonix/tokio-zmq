@@ -19,12 +19,9 @@
 
 use std::rc::Rc;
 
-use async::sink::ZmqSink;
-use async::future::ZmqRequest;
-
 use zmq;
-use futures::Future;
 
+#[derive(ZmqSocket, SinkSocket, StreamSocket, Builder)]
 pub struct Pub {
     sock: Rc<zmq::Socket>,
 }
@@ -32,42 +29,5 @@ pub struct Pub {
 impl Pub {
     pub fn new() -> PubBuilder {
         PubBuilder::new()
-    }
-
-    pub fn send(&self, msg: zmq::Message) -> impl Future<Item = (), Error = zmq::Error> {
-        ZmqRequest::new(Rc::clone(&self.sock), msg)
-    }
-
-    pub fn sink<E>(&self) -> ZmqSink<E>
-    where
-        E: From<zmq::Error>,
-    {
-        ZmqSink::new(Rc::clone(&self.sock))
-    }
-}
-
-pub enum PubBuilder {
-    Sock(Rc<zmq::Socket>),
-    Fail(zmq::Error),
-}
-
-impl PubBuilder {
-    pub fn new() -> Self {
-        let context = zmq::Context::new();
-        match context.socket(zmq::PUB) {
-            Ok(sock) => PubBuilder::Sock(Rc::new(sock)),
-            Err(e) => PubBuilder::Fail(e),
-        }
-    }
-
-    pub fn bind(self, addr: &str) -> zmq::Result<Pub> {
-        match self {
-            PubBuilder::Sock(sock) => {
-                sock.bind(addr)?;
-
-                Ok(Pub { sock })
-            }
-            PubBuilder::Fail(e) => Err(e),
-        }
     }
 }

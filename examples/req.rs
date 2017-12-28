@@ -29,16 +29,15 @@ use futures::{Future, Stream};
 use zmq_futures::req::Req;
 
 fn main() {
-    let zmq = Req::new().connect("tcp://localhost:5560").unwrap();
+    let zmq = Req::new().connect("tcp://localhost:5560").build().unwrap();
 
     let mut core = Core::new().unwrap();
 
     let stream = iter_ok(5..10)
         .and_then(|req| {
             println!("sending: {}", req);
-            zmq.send(zmq::Message::from_slice(b"Hello").unwrap()).map(
-                move |message| (req, message),
-            )
+            zmq.request(zmq::Message::from_slice(b"Hello").unwrap())
+                .map(move |message| (req, message))
         })
         .for_each(|(req, message)| {
             println!("Received reply {} {}", req, message.as_str().unwrap());

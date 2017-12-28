@@ -26,16 +26,16 @@ extern crate futures;
 
 pub mod async;
 pub mod rep;
-// pub mod req;
-// pub mod zpub;
-// pub mod sub;
-// pub mod push;
-// pub mod pull;
+pub mod req;
+pub mod zpub;
+pub mod sub;
+pub mod push;
+pub mod pull;
 
 use std::rc::Rc;
 use std::fmt::Debug;
 
-use futures::Future;
+use futures::{Future, Stream};
 
 use async::{MsgStream, ZmqRequest, ZmqResponse, ZmqSink, ZmqStream};
 
@@ -47,6 +47,49 @@ pub trait Handler: Clone {
     type Future: Future<Item = Self::Response, Error = Self::Error>;
 
     fn call(&self, req: Self::Request) -> Self::Future;
+}
+
+pub struct Runner<'a, P, C, H>
+where
+    P: StreamSocket + 'a,
+    C: SinkSocket + 'a,
+    H: Handler,
+{
+    stream: &'a P,
+    sink: &'a C,
+    handler: H,
+}
+
+impl<'a, P, C, H> Runner<'a, P, C, H>
+where
+    P: StreamSocket + 'a,
+    C: SinkSocket + 'a,
+    H: Handler,
+{
+    pub fn new(stream: &'a P, sink: &'a C, handler: H) -> Self {
+        Runner {
+            stream,
+            sink,
+            handler,
+        }
+    }
+
+    pub fn run(
+        &self,
+    ) -> impl Future<
+        Item = (impl Stream<Item = zmq::Message, Error = H::Error>, ZmqSink<H::Error>),
+        Error = H::Error,
+    > {
+        let handler = self.handler.clone();
+
+        self.stream
+            .stream()
+            .map_err(H::Error::from)
+            .and_then(move |msg| handler.call(msg.into()))
+            .map(|msg| msg.into())
+            .map_err(|e| e.into())
+            .forward(self.sink.sink::<H::Error>())
+    }
 }
 
 pub trait ZmqSocket {
@@ -63,15 +106,15 @@ pub trait StreamSocket: ZmqSocket {
     }
 }
 
-pub trait SinkSocket<E>: ZmqSocket
-where
-    E: From<zmq::Error>,
-{
+pub trait SinkSocket: ZmqSocket {
     fn send(&self, msg: zmq::Message) -> ZmqRequest {
         ZmqRequest::new(self.socket(), msg)
     }
 
-    fn sink(&self) -> async::ZmqSink<E> {
+    fn sink<E>(&self) -> async::ZmqSink<E>
+    where
+        E: From<zmq::Error>,
+    {
         ZmqSink::new(self.socket())
     }
 }

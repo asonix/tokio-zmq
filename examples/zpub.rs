@@ -28,6 +28,7 @@ use std::time::Duration;
 use futures::Stream;
 use tokio_core::reactor::{Core, Interval};
 use zmq_futures::zpub::Pub;
+use zmq_futures::SinkSocket;
 
 #[derive(Debug)]
 enum Error {
@@ -49,7 +50,7 @@ impl From<io::Error> for Error {
 
 fn main() {
     let mut core = Core::new().unwrap();
-    let conn = Pub::new().bind("tcp://*:5556").unwrap();
+    let conn = Pub::new().bind("tcp://*:5556").build().unwrap();
 
     println!("Got zmq");
 

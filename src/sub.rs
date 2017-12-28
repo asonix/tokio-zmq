@@ -19,10 +19,9 @@
 
 use std::rc::Rc;
 
-use async::stream::ZmqStream;
-
 use zmq;
 
+#[derive(ZmqSocket, SinkSocket, StreamSocket, CustomBuilder)]
 pub struct Sub {
     sock: Rc<zmq::Socket>,
 }
@@ -31,53 +30,22 @@ impl Sub {
     pub fn new() -> SubBuilder {
         SubBuilder::new()
     }
-
-    pub fn stream(&self) -> ZmqStream {
-        ZmqStream::new(Rc::clone(&self.sock))
-    }
 }
 
-pub enum SubBuilder {
+pub enum SubCustomBuilder {
     Sock(Rc<zmq::Socket>),
     Fail(zmq::Error),
 }
 
-impl SubBuilder {
-    pub fn new() -> Self {
-        let context = zmq::Context::new();
-        match context.socket(zmq::SUB) {
-            Ok(sock) => SubBuilder::Sock(Rc::new(sock)),
-            Err(e) => SubBuilder::Fail(e),
-        }
-    }
-
-    pub fn connect(self, addr: &str) -> SubFilter {
-        match self {
-            SubBuilder::Sock(sock) => {
-                match sock.connect(addr) {
-                    Ok(_) => SubFilter::Sock(sock),
-                    Err(e) => SubFilter::Fail(e),
-                }
-            }
-            SubBuilder::Fail(e) => SubFilter::Fail(e),
-        }
-    }
-}
-
-pub enum SubFilter {
-    Sock(Rc<zmq::Socket>),
-    Fail(zmq::Error),
-}
-
-impl SubFilter {
+impl SubCustomBuilder {
     pub fn filter(self, filter: &[u8]) -> zmq::Result<Sub> {
         match self {
-            SubFilter::Sock(sock) => {
+            SubCustomBuilder::Sock(sock) => {
                 sock.set_subscribe(filter)?;
 
                 Ok(Sub { sock })
             }
-            SubFilter::Fail(e) => Err(e),
+            SubCustomBuilder::Fail(e) => Err(e),
         }
     }
 }

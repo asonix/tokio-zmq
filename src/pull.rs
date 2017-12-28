@@ -19,10 +19,9 @@
 
 use std::rc::Rc;
 
-use async::stream::ZmqStream;
-
 use zmq;
 
+#[derive(ZmqSocket, SinkSocket, StreamSocket, Builder)]
 pub struct Pull {
     sock: Rc<zmq::Socket>,
 }
@@ -30,46 +29,5 @@ pub struct Pull {
 impl Pull {
     pub fn new() -> PullBuilder {
         PullBuilder::new()
-    }
-
-    pub fn stream(&self) -> ZmqStream {
-        ZmqStream::new(Rc::clone(&self.sock))
-    }
-}
-
-pub enum PullBuilder {
-    Sock(Rc<zmq::Socket>),
-    Fail(zmq::Error),
-}
-
-impl PullBuilder {
-    pub fn new() -> Self {
-        let context = zmq::Context::new();
-        match context.socket(zmq::PULL) {
-            Ok(sock) => PullBuilder::Sock(Rc::new(sock)),
-            Err(e) => PullBuilder::Fail(e),
-        }
-    }
-
-    pub fn bind(self, addr: &str) -> zmq::Result<Pull> {
-        match self {
-            PullBuilder::Sock(sock) => {
-                sock.bind(&addr)?;
-
-                Ok(Pull { sock })
-            }
-            PullBuilder::Fail(e) => Err(e),
-        }
-    }
-
-    pub fn connect(self, addr: &str) -> zmq::Result<Pull> {
-        match self {
-            PullBuilder::Sock(sock) => {
-                sock.connect(&addr)?;
-
-                Ok(Pull { sock })
-            }
-            PullBuilder::Fail(e) => Err(e),
-        }
     }
 }

@@ -30,22 +30,4 @@ impl Rep {
     pub fn new() -> RepBuilder {
         RepBuilder::new()
     }
-
-    /*
-    pub fn runner(
-        &self,
-    ) -> impl Future<
-        Item = (impl Stream<Item = zmq::Message, Error = H::Error>, ZmqSink<H::Error>),
-        Error = H::Error,
-    > {
-        let handler = self.handler.clone();
-
-        self.stream()
-            .map_err(H::Error::from)
-            .and_then(move |msg| handler.call(msg.into()))
-            .map(|msg| msg.into())
-            .map_err(|e| e.into())
-            .forward(self.sink())
-    }
-    */
 }
