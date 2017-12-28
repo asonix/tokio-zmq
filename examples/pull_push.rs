@@ -29,10 +29,11 @@ use futures::{Future, Stream};
 use tokio_core::reactor::Core;
 use zmq_futures::push::Push;
 use zmq_futures::pull::Pull;
-use zmq_futures::{SinkSocket, StreamSocket};
+use zmq_futures::async::stream::MsgStream;
+use zmq_futures::{Handler, Runner};
 
 #[derive(Debug)]
-enum Error {
+pub enum Error {
     Zmq(zmq::Error),
     Io(io::Error),
     Utf8(FromUtf8Error),
@@ -56,23 +57,36 @@ impl From<FromUtf8Error> for Error {
     }
 }
 
+#[derive(Clone)]
+pub struct PassThrough;
+
+impl Handler for PassThrough {
+    type Request = MsgStream;
+    type Response = zmq::Message;
+    type Error = Error;
+
+    type Future = Box<Future<Item = Self::Response, Error = Self::Error>>;
+
+    fn call(&self, req: Self::Request) -> Self::Future {
+        let res = req.map(|msg| msg.to_vec())
+            .concat2()
+            .map_err(Error::from)
+            .and_then(|msg| {
+                let msg = String::from_utf8(msg)?;
+                println!("msg: '{}'", msg);
+                Ok(zmq::Message::from_slice(msg.as_bytes())?)
+            });
+
+        Box::new(res)
+    }
+}
+
 fn main() {
     let mut core = Core::new().unwrap();
     let stream = Pull::new().connect("tcp://localhost:5557").build().unwrap();
     let sink = Push::new().connect("tcp://localhost:5558").build().unwrap();
 
-    let process = stream
-        .stream()
-        .map_err(Error::from)
-        .and_then(|msg| {
-            msg.map(|msg| msg.to_vec()).concat2().map_err(Error::from)
-        })
-        .and_then(|msg| {
-            let msg = String::from_utf8(msg)?;
-            println!("msg: '{}'", msg);
-            zmq::Message::from_slice(msg.as_bytes()).map_err(Error::from)
-        })
-        .forward(sink.sink::<Error>());
+    let runner = Runner::new(&stream, &sink, PassThrough);
 
-    core.run(process).unwrap();
+    core.run(runner.run()).unwrap();
 }

@@ -86,7 +86,5 @@ fn main() {
 
     let runner = Runner::new(&zmq, &zmq, Echo);
 
-    println!("Got zmq");
-
     core.run(runner.run()).unwrap();
 }
