@@ -22,8 +22,8 @@ use std::fmt::Debug;
 use zmq;
 use futures::{Future, Stream};
 
-use async::{MsgStream, ZmqSink};
-use super::{StreamSocket, SinkSocket};
+use async::{ControlHandler, MsgStream, ZmqSink};
+use super::{Controlled, StreamSocket, SinkSocket};
 
 pub mod response;
 
@@ -46,6 +46,37 @@ where
     stream: &'a P,
     sink: &'a C,
     handler: H,
+}
+
+impl<'a, P, C, H> Runner<'a, P, C, H>
+where
+    P: Controlled + StreamSocket + 'a,
+    C: SinkSocket + 'a,
+    H: Handler,
+{
+    pub fn run_controlled<S>(
+        &self,
+        controll_handler: S,
+    ) -> impl Future<
+        Item = (impl Stream<
+            Item = impl Stream<Item = zmq::Message, Error = H::Error>,
+            Error = H::Error,
+        >,
+                ZmqSink<H::Response, H::Error>),
+        Error = H::Error,
+    >
+    where
+        S: ControlHandler,
+    {
+        let handler = self.handler.clone();
+
+        self.stream
+            .controlled_stream::<S, H::Error>(controll_handler)
+            .and_then(move |msg| handler.call(msg.into()))
+            .map(|msg| msg.into())
+            .map_err(|e| e.into())
+            .forward(self.sink.sink::<H::Response, H::Error>())
+    }
 }
 
 impl<'a, P, C, H> Runner<'a, P, C, H>

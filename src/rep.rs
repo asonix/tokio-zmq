@@ -21,7 +21,10 @@ use std::rc::Rc;
 
 use zmq;
 
-#[derive(ZmqSocket, SinkSocket, StreamSocket, Builder)]
+use super::{StreamSocket, ZmqSocket};
+use async::stream::{ControlHandler, ZmqControlledStream};
+
+#[derive(ZmqSocket, SinkSocket, StreamSocket, Builder, Controlled)]
 pub struct Rep {
     sock: Rc<zmq::Socket>,
 }
@@ -29,5 +32,12 @@ pub struct Rep {
 impl Rep {
     pub fn new() -> RepBuilder {
         RepBuilder::new()
+    }
+
+    pub fn controlled<S>(controller: S) -> RepControlledBuilder
+    where
+        S: StreamSocket + ZmqSocket,
+    {
+        RepControlledBuilder::new(controller)
     }
 }

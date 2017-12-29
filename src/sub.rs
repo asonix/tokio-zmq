@@ -21,7 +21,10 @@ use std::rc::Rc;
 
 use zmq;
 
-#[derive(ZmqSocket, SinkSocket, StreamSocket, CustomBuilder)]
+use super::{StreamSocket, ZmqSocket};
+use async::stream::{ControlHandler, ZmqControlledStream};
+
+#[derive(ZmqSocket, SinkSocket, StreamSocket, CustomBuilder, CustomControlled)]
 pub struct Sub {
     sock: Rc<zmq::Socket>,
 }
@@ -29,6 +32,13 @@ pub struct Sub {
 impl Sub {
     pub fn new() -> SubBuilder {
         SubBuilder::new()
+    }
+
+    pub fn controlled<S>(controller: S) -> SubControlledBuilder
+    where
+        S: StreamSocket + ZmqSocket,
+    {
+        SubControlledBuilder::new(controller)
     }
 }
 
@@ -46,6 +56,24 @@ impl SubCustomBuilder {
                 Ok(Sub { sock })
             }
             SubCustomBuilder::Fail(e) => Err(e),
+        }
+    }
+}
+
+pub enum SubControlledCustomBuilder {
+    Sock(Rc<zmq::Socket>, Rc<zmq::Socket>),
+    Fail(zmq::Error),
+}
+
+impl SubControlledCustomBuilder {
+    pub fn filter(self, filter: &[u8]) -> zmq::Result<SubControlled> {
+        match self {
+            SubControlledCustomBuilder::Sock(sock, controller) => {
+                sock.set_subscribe(filter)?;
+
+                Ok(SubControlled { sock, controller })
+            }
+            SubControlledCustomBuilder::Fail(e) => Err(e),
         }
     }
 }

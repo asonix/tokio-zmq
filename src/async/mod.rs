@@ -21,6 +21,6 @@ pub mod stream;
 pub mod sink;
 pub mod future;
 
-pub use self::stream::{MsgStream, ZmqStream};
+pub use self::stream::{MsgStream, ZmqStream, ControlHandler, ZmqControlledStream};
 pub use self::sink::ZmqSink;
 pub use self::future::{ZmqRequest, ZmqResponse};

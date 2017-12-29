@@ -1,3 +1,4 @@
+#![recursion_limit="128"]
 #![feature(proc_macro, proc_macro_lib)]
 
 extern crate proc_macro;
@@ -8,45 +9,88 @@ extern crate syn;
 #[macro_use]
 extern crate quote;
 
-#[proc_macro_derive(CustomBuilder)]
-pub fn custom_builder(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(CustomControlled)]
+pub fn custom_controlled(input: TokenStream) -> TokenStream {
     let source = input.to_string();
     let ast = syn::parse_derive_input(&source).unwrap();
-    let expanded = expand_custom_builder(&ast);
+    let expanded = controlled_builder(&ast, true);
     quote!(#expanded).to_string().parse().unwrap()
 }
 
-fn expand_custom_builder(ast: &syn::DeriveInput) -> quote::Tokens {
-    let name = &ast.ident;
+#[proc_macro_derive(Controlled)]
+pub fn controlled(input: TokenStream) -> TokenStream {
+    let source = input.to_string();
+    let ast = syn::parse_derive_input(&source).unwrap();
+    let expanded = controlled_builder(&ast, false);
+    quote!(#expanded).to_string().parse().unwrap()
+}
 
-    let socket_type = syn::Ident::from(format!("zmq::{}", format!("{}", name).to_uppercase()));
+fn controlled_builder(ast: &syn::DeriveInput, custom: bool) -> quote::Tokens {
+    let orig_name = &ast.ident;
+    let name = syn::Ident::from(format!("{}Controlled", orig_name));
+
+    let socket_type = syn::Ident::from(format!("zmq::{}", format!("{}", orig_name).to_uppercase()));
 
     let builder_name = syn::Ident::from(format!("{}Builder", name));
     let bind_builder_name = syn::Ident::from(format!("{}BindBuilder", name));
     let connect_builder_name = syn::Ident::from(format!("{}ConnectBuilder", name));
-
     let custom_builder_name = syn::Ident::from(format!("{}CustomBuilder", name));
 
-    quote! {
+    let base = quote! {
+        pub struct #name {
+            sock: Rc<zmq::Socket>,
+            controller: Rc<zmq::Socket>,
+        }
+
+        impl ::ZmqSocket for #name {
+            fn socket(&self) -> Rc<zmq::Socket> {
+                Rc::clone(&self.sock)
+            }
+        }
+
+        impl ::Controlled for #name {
+            fn controlled_stream<C, E>(&self, handler: C) -> ZmqControlledStream<C, E>
+            where
+                C: ControlHandler,
+                E: From<zmq::Error>
+            {
+                ZmqControlledStream::new(Rc::clone(&self.sock), Rc::clone(&self.controller), handler)
+            }
+        }
+
+        impl ::StreamSocket for #name {}
+
+        impl #name {
+            pub fn new<S>(controller: S) -> #builder_name
+            where
+                S: ZmqSocket + StreamSocket,
+            {
+                #builder_name::new(controller)
+            }
+        }
+
         pub enum #builder_name {
-            Sock(Rc<zmq::Socket>),
+            Sock(Rc<zmq::Socket>, Rc<zmq::Socket>),
             Fail(zmq::Error),
         }
 
         impl #builder_name {
-            pub fn new() -> Self {
+            pub fn new<S>(controller: S) -> Self
+            where
+                S: ZmqSocket + StreamSocket,
+            {
                 let ctx = zmq::Context::new();
 
                 match ctx.socket(#socket_type) {
-                    Ok(sock) => #builder_name::Sock(Rc::new(sock)),
+                    Ok(sock) => #builder_name::Sock(Rc::new(sock), controller.socket()),
                     Err(e) => #builder_name::Fail(e),
                 }
             }
 
             pub fn bind(self, addr: &str) -> #bind_builder_name {
                 match self {
-                    #builder_name::Sock(sock) => {
-                        #bind_builder_name::Sock(sock).bind(addr)
+                    #builder_name::Sock(sock, controller) => {
+                        #bind_builder_name::Sock(sock, controller).bind(addr)
                     }
                     #builder_name::Fail(e) => #bind_builder_name::Fail(e)
                 }
@@ -54,8 +98,8 @@ fn expand_custom_builder(ast: &syn::DeriveInput) -> quote::Tokens {
 
             pub fn connect(self, addr: &str) -> #connect_builder_name {
                 match self {
-                    #builder_name::Sock(sock) => {
-                        #connect_builder_name::Sock(sock).connect(addr)
+                    #builder_name::Sock(sock, controller) => {
+                        #connect_builder_name::Sock(sock, controller).connect(addr)
                     }
                     #builder_name::Fail(e) => #connect_builder_name::Fail(e)
                 }
@@ -63,68 +107,128 @@ fn expand_custom_builder(ast: &syn::DeriveInput) -> quote::Tokens {
         }
 
         pub enum #bind_builder_name {
-            Sock(Rc<zmq::Socket>),
+            Sock(Rc<zmq::Socket>, Rc<zmq::Socket>),
             Fail(zmq::Error),
-        }
-
-        impl #bind_builder_name {
-            pub fn bind(self, addr: &str) -> Self {
-                match self {
-                    #bind_builder_name::Sock(sock) => {
-                        match sock.bind(addr) {
-                            Ok(_) => #bind_builder_name::Sock(sock),
-                            Err(e) => #bind_builder_name::Fail(e),
-                        }
-                    }
-                    #bind_builder_name::Fail(e) => #bind_builder_name::Fail(e)
-                }
-            }
-
-            pub fn more(self) -> #custom_builder_name {
-                match self {
-                    #bind_builder_name::Sock(sock) => #custom_builder_name::Sock(sock),
-                    #bind_builder_name::Fail(e) => #custom_builder_name::Fail(e),
-                }
-            }
         }
 
         pub enum #connect_builder_name {
-            Sock(Rc<zmq::Socket>),
+            Sock(Rc<zmq::Socket>, Rc<zmq::Socket>),
             Fail(zmq::Error),
         }
+    };
 
-        impl #connect_builder_name {
-            pub fn connect(self, addr: &str) -> Self {
-                match self {
-                    #connect_builder_name::Sock(sock) => {
-                        match sock.connect(addr) {
-                            Ok(_) => #connect_builder_name::Sock(sock),
-                            Err(e) => #connect_builder_name::Fail(e),
+    if custom {
+        quote! {
+            #base
+
+            impl #bind_builder_name {
+                pub fn bind(self, addr: &str) -> Self {
+                    match self {
+                        #bind_builder_name::Sock(sock, controller) => {
+                            match sock.bind(addr) {
+                                Ok(_) => #bind_builder_name::Sock(sock, controller),
+                                Err(e) => #bind_builder_name::Fail(e),
+                            }
                         }
+                        #bind_builder_name::Fail(e) => #bind_builder_name::Fail(e)
                     }
-                    #connect_builder_name::Fail(e) => #connect_builder_name::Fail(e)
+                }
+
+                pub fn more(self) -> #custom_builder_name {
+                    match self {
+                        #bind_builder_name::Sock(sock, controller) => #custom_builder_name::Sock(sock, controller),
+                        #bind_builder_name::Fail(e) => #custom_builder_name::Fail(e),
+                    }
                 }
             }
 
-            pub fn more(self) -> #custom_builder_name {
-                match self {
-                    #connect_builder_name::Sock(sock) => #custom_builder_name::Sock(sock),
-                    #connect_builder_name::Fail(e) => #custom_builder_name::Fail(e),
+            impl #connect_builder_name {
+                pub fn connect(self, addr: &str) -> Self {
+                    match self {
+                        #connect_builder_name::Sock(sock, controller) => {
+                            match sock.connect(addr) {
+                                Ok(_) => #connect_builder_name::Sock(sock, controller),
+                                Err(e) => #connect_builder_name::Fail(e),
+                            }
+                        }
+                        #connect_builder_name::Fail(e) => #connect_builder_name::Fail(e)
+                    }
+                }
+
+                pub fn more(self) -> #custom_builder_name {
+                    match self {
+                        #connect_builder_name::Sock(sock, controller) => #custom_builder_name::Sock(sock, controller),
+                        #connect_builder_name::Fail(e) => #custom_builder_name::Fail(e),
+                    }
+                }
+            }
+        }
+    } else {
+        quote! {
+            #base
+
+            impl #bind_builder_name {
+                pub fn bind(self, addr: &str) -> Self {
+                    match self {
+                        #bind_builder_name::Sock(sock, controller) => {
+                            match sock.bind(addr) {
+                                Ok(_) => #bind_builder_name::Sock(sock, controller),
+                                Err(e) => #bind_builder_name::Fail(e),
+                            }
+                        }
+                        #bind_builder_name::Fail(e) => #bind_builder_name::Fail(e)
+                    }
+                }
+
+                pub fn build(self) -> zmq::Result<#name> {
+                    match self {
+                        #bind_builder_name::Sock(sock, controller) => Ok(#name { sock, controller }),
+                        #bind_builder_name::Fail(e) => Err(e),
+                    }
+                }
+            }
+
+            impl #connect_builder_name {
+                pub fn connect(self, addr: &str) -> Self {
+                    match self {
+                        #connect_builder_name::Sock(sock, controller) => {
+                            match sock.connect(addr) {
+                                Ok(_) => #connect_builder_name::Sock(sock, controller),
+                                Err(e) => #connect_builder_name::Fail(e),
+                            }
+                        }
+                        #connect_builder_name::Fail(e) => #connect_builder_name::Fail(e)
+                    }
+                }
+
+                pub fn build(self) -> zmq::Result<#name> {
+                    match self {
+                        #connect_builder_name::Sock(sock, controller) => Ok(#name { sock, controller }),
+                        #connect_builder_name::Fail(e) => Err(e),
+                    }
                 }
             }
         }
     }
 }
 
+#[proc_macro_derive(CustomBuilder)]
+pub fn custom_builder(input: TokenStream) -> TokenStream {
+    let source = input.to_string();
+    let ast = syn::parse_derive_input(&source).unwrap();
+    let expanded = expand_builder(&ast, true);
+    quote!(#expanded).to_string().parse().unwrap()
+}
+
 #[proc_macro_derive(Builder)]
 pub fn builder(input: TokenStream) -> TokenStream {
     let source = input.to_string();
     let ast = syn::parse_derive_input(&source).unwrap();
-    let expanded = expand_builder(&ast);
+    let expanded = expand_builder(&ast, false);
     quote!(#expanded).to_string().parse().unwrap()
 }
 
-fn expand_builder(ast: &syn::DeriveInput) -> quote::Tokens {
+fn expand_builder(ast: &syn::DeriveInput, custom: bool) -> quote::Tokens {
     let name = &ast.ident;
 
     let socket_type = syn::Ident::from(format!("zmq::{}", format!("{}", name).to_uppercase()));
@@ -132,8 +236,10 @@ fn expand_builder(ast: &syn::DeriveInput) -> quote::Tokens {
     let builder_name = syn::Ident::from(format!("{}Builder", name));
     let bind_builder_name = syn::Ident::from(format!("{}BindBuilder", name));
     let connect_builder_name = syn::Ident::from(format!("{}ConnectBuilder", name));
+    let custom_builder_name = syn::Ident::from(format!("{}CustomBuilder", name));
 
-    quote! {
+    let base =
+        quote! {
         pub enum #builder_name {
             Sock(Rc<zmq::Socket>),
             Fail(zmq::Error),
@@ -173,49 +279,101 @@ fn expand_builder(ast: &syn::DeriveInput) -> quote::Tokens {
             Fail(zmq::Error),
         }
 
-        impl #bind_builder_name {
-            pub fn bind(self, addr: &str) -> Self {
-                match self {
-                    #bind_builder_name::Sock(sock) => {
-                        match sock.bind(addr) {
-                            Ok(_) => #bind_builder_name::Sock(sock),
-                            Err(e) => #bind_builder_name::Fail(e),
-                        }
-                    }
-                    #bind_builder_name::Fail(e) => #bind_builder_name::Fail(e)
-                }
-            }
-
-            pub fn build(self) -> zmq::Result<#name> {
-                match self {
-                    #bind_builder_name::Sock(sock) => Ok(#name { sock }),
-                    #bind_builder_name::Fail(e) => Err(e),
-                }
-            }
-        }
-
         pub enum #connect_builder_name {
             Sock(Rc<zmq::Socket>),
             Fail(zmq::Error),
         }
+    };
 
-        impl #connect_builder_name {
-            pub fn connect(self, addr: &str) -> Self {
-                match self {
-                    #connect_builder_name::Sock(sock) => {
-                        match sock.connect(addr) {
-                            Ok(_) => #connect_builder_name::Sock(sock),
-                            Err(e) => #connect_builder_name::Fail(e),
+    if custom {
+        quote! {
+            #base
+
+            impl #bind_builder_name {
+                pub fn bind(self, addr: &str) -> Self {
+                    match self {
+                        #bind_builder_name::Sock(sock) => {
+                            match sock.bind(addr) {
+                                Ok(_) => #bind_builder_name::Sock(sock),
+                                Err(e) => #bind_builder_name::Fail(e),
+                            }
                         }
+                        #bind_builder_name::Fail(e) => #bind_builder_name::Fail(e)
                     }
-                    #connect_builder_name::Fail(e) => #connect_builder_name::Fail(e)
+                }
+
+                pub fn more(self) -> #custom_builder_name {
+                    match self {
+                        #bind_builder_name::Sock(sock) => #custom_builder_name::Sock(sock),
+                        #bind_builder_name::Fail(e) => #custom_builder_name::Fail(e),
+                    }
                 }
             }
 
-            pub fn build(self) -> zmq::Result<#name> {
-                match self {
-                    #connect_builder_name::Sock(sock) => Ok(#name { sock }),
-                    #connect_builder_name::Fail(e) => Err(e),
+            impl #connect_builder_name {
+                pub fn connect(self, addr: &str) -> Self {
+                    match self {
+                        #connect_builder_name::Sock(sock) => {
+                            match sock.connect(addr) {
+                                Ok(_) => #connect_builder_name::Sock(sock),
+                                Err(e) => #connect_builder_name::Fail(e),
+                            }
+                        }
+                        #connect_builder_name::Fail(e) => #connect_builder_name::Fail(e)
+                    }
+                }
+
+                pub fn more(self) -> #custom_builder_name {
+                    match self {
+                        #connect_builder_name::Sock(sock) => #custom_builder_name::Sock(sock),
+                        #connect_builder_name::Fail(e) => #custom_builder_name::Fail(e),
+                    }
+                }
+            }
+        }
+    } else {
+        quote! {
+            #base
+
+            impl #bind_builder_name {
+                pub fn bind(self, addr: &str) -> Self {
+                    match self {
+                        #bind_builder_name::Sock(sock) => {
+                            match sock.bind(addr) {
+                                Ok(_) => #bind_builder_name::Sock(sock),
+                                Err(e) => #bind_builder_name::Fail(e),
+                            }
+                        }
+                        #bind_builder_name::Fail(e) => #bind_builder_name::Fail(e)
+                    }
+                }
+
+                pub fn build(self) -> zmq::Result<#name> {
+                    match self {
+                        #bind_builder_name::Sock(sock) => Ok(#name { sock }),
+                        #bind_builder_name::Fail(e) => Err(e),
+                    }
+                }
+            }
+
+            impl #connect_builder_name {
+                pub fn connect(self, addr: &str) -> Self {
+                    match self {
+                        #connect_builder_name::Sock(sock) => {
+                            match sock.connect(addr) {
+                                Ok(_) => #connect_builder_name::Sock(sock),
+                                Err(e) => #connect_builder_name::Fail(e),
+                            }
+                        }
+                        #connect_builder_name::Fail(e) => #connect_builder_name::Fail(e)
+                    }
+                }
+
+                pub fn build(self) -> zmq::Result<#name> {
+                    match self {
+                        #connect_builder_name::Sock(sock) => Ok(#name { sock }),
+                        #connect_builder_name::Fail(e) => Err(e),
+                    }
                 }
             }
         }

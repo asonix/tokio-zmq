@@ -55,12 +55,13 @@ fn main() {
     let workers = Push::new().bind("tcp://*:5557").build().unwrap();
     let sink = Push::new().connect("tcp://localhost:5558").build().unwrap();
 
-    let start = zmq::Message::from_slice(b"0").unwrap();
+    let start_msg = zmq::Message::from_slice(b"START").unwrap();
+    let stop_msg = zmq::Message::from_slice(b"STOP").unwrap();
 
-    let interval = Interval::new(Duration::from_secs(1), &core.handle()).unwrap();
+    let interval = Interval::new(Duration::from_millis(200), &core.handle()).unwrap();
 
-    let process = sink.send(start).map_err(Error::from).and_then(|_| {
-        iter_ok(0..100)
+    let process = sink.send(start_msg).map_err(Error::from).and_then(|_| {
+        iter_ok(0..10)
             .zip(interval)
             .map_err(Error::from)
             .and_then(|(i, _)| {
@@ -73,6 +74,7 @@ fn main() {
                 Ok(msg.into())
             })
             .forward(workers.sink::<Singleton<Error>, Error>())
+            .and_then(move |_| sink.send(stop_msg).map_err(Error::from))
     });
 
     core.run(process).unwrap();

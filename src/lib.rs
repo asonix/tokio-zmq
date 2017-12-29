@@ -42,7 +42,7 @@ pub use self::push::Push;
 pub use self::pull::Pull;
 pub use self::service::{Handler, Runner};
 
-use self::async::{ZmqRequest, ZmqResponse, ZmqSink, ZmqStream};
+use self::async::{ZmqRequest, ZmqResponse, ZmqSink, ZmqStream, ControlHandler};
 use futures::Stream;
 
 use std::rc::Rc;
@@ -62,6 +62,13 @@ pub trait StreamSocket: ZmqSocket {
     {
         ZmqStream::new(self.socket())
     }
+}
+
+pub trait Controlled: ZmqSocket {
+    fn controlled_stream<C, E>(&self, handler: C) -> async::ZmqControlledStream<C, E>
+    where
+        C: ControlHandler,
+        E: From<zmq::Error>;
 }
 
 pub trait SinkSocket: ZmqSocket {

@@ -27,9 +27,8 @@ use std::string::FromUtf8Error;
 
 use futures::{Future, Stream};
 use tokio_core::reactor::Core;
-use zmq_futures::Push;
-use zmq_futures::Pull;
-use zmq_futures::async::MsgStream;
+use zmq_futures::{Pull, Push, Sub};
+use zmq_futures::async::{ControlHandler, MsgStream};
 use zmq_futures::service::response::Singleton;
 use zmq_futures::{Handler, Runner};
 
@@ -79,12 +78,31 @@ impl Handler for PassThrough {
     }
 }
 
+pub struct Stop;
+
+impl ControlHandler for Stop {
+    type Request = Vec<zmq::Message>;
+
+    fn should_stop(&self, _: Self::Request) -> bool {
+        println!("Got stop signal");
+        true
+    }
+}
+
 fn main() {
     let mut core = Core::new().unwrap();
-    let stream = Pull::new().connect("tcp://localhost:5557").build().unwrap();
+    let cmd = Sub::new()
+        .connect("tcp://localhost:5559")
+        .more()
+        .filter(b"")
+        .unwrap();
+    let stream = Pull::controlled(cmd)
+        .connect("tcp://localhost:5557")
+        .build()
+        .unwrap();
     let sink = Push::new().connect("tcp://localhost:5558").build().unwrap();
 
     let runner = Runner::new(&stream, &sink, PassThrough);
 
-    core.run(runner.run()).unwrap();
+    core.run(runner.run_controlled(Stop)).unwrap();
 }

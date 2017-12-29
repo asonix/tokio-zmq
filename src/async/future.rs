@@ -45,7 +45,11 @@ impl ZmqRequest {
 
         let mut items = [self.socket.as_poll_item(zmq::POLLOUT)];
 
-        zmq::poll(&mut items, 1)?;
+        let event_count = zmq::poll(&mut items, 1)?;
+        if event_count == 0 {
+            task::current().notify();
+            return Ok(Async::NotReady);
+        }
 
         for item in items.iter() {
             if item.is_writable() {
@@ -92,7 +96,9 @@ impl ZmqResponse {
         let mut items = [self.socket.as_poll_item(zmq::POLLIN)];
 
         // Don't block waiting for an item to become ready
-        zmq::poll(&mut items, 1)?;
+        if zmq::poll(&mut items, 1)? == 0 {
+            return Ok(Async::NotReady);
+        }
 
         let mut msg = zmq::Message::new().unwrap();
 
