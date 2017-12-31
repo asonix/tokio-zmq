@@ -17,22 +17,26 @@
  * along with ZeroMQ Futures.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#![feature(try_from)]
+
 extern crate futures;
 extern crate tokio_core;
 extern crate zmq;
-extern crate zmq_futures;
+extern crate tokio_zmq;
+
+use std::rc::Rc;
+use std::convert::TryInto;
+use std::collections::VecDeque;
 
 use futures::{Future, Stream};
 use tokio_core::reactor::Core;
-use zmq_futures::{Controlled, Pub, Pull, SinkSocket, Sub};
-use zmq_futures::async::ControlHandler;
+use tokio_zmq::{Pub, Pull, PullControlled, Sub};
+use tokio_zmq::{ControlHandler, ControlledStreamSocket, SinkSocket, Socket};
 
 pub struct Stop;
 
 impl ControlHandler for Stop {
-    type Request = Vec<zmq::Message>;
-
-    fn should_stop(&self, _: Self::Request) -> bool {
+    fn should_stop(&self, _: VecDeque<zmq::Message>) -> bool {
         println!("Got stop signal");
         true
     }
@@ -40,32 +44,45 @@ impl ControlHandler for Stop {
 
 fn main() {
     let mut core = Core::new().unwrap();
-    let cmd = Sub::new()
-        .connect("tcp://localhost:5559")
-        .more()
-        .filter(b"")
-        .unwrap();
-    let conn = Pull::controlled(cmd).bind("tcp://*:5558").build().unwrap();
-    let send_cmd = Pub::new().bind("tcp://*:5559").build().unwrap();
-
     let handle = core.handle();
+    let ctx = Rc::new(zmq::Context::new());
+    let cmd: Sub = Socket::new(ctx.clone(), handle.clone())
+        .connect("tcp://localhost:5559".into())
+        .filter(Vec::new())
+        .try_into()
+        .unwrap();
+    let conn: Pull = Socket::new(ctx.clone(), handle.clone())
+        .bind("tcp://*:5558".into())
+        .try_into()
+        .unwrap();
+    let conn: PullControlled = conn.controlled(cmd);
+    let send_cmd: Pub = Socket::new(ctx, handle.clone())
+        .bind("tcp://*:5559".into())
+        .try_into()
+        .unwrap();
 
-    let process = conn.controlled_stream::<Stop, zmq::Error>(Stop)
-        .and_then(|msg| msg.map(|msg| msg.to_vec()).concat2())
-        .for_each(move |msg| {
-            let msg = String::from_utf8(msg).unwrap();
-            println!("msg: '{}'", msg);
+    let process = conn.stream(Stop).for_each(move |multipart| {
+        for msg in multipart {
+            if let Some(msg) = msg.as_str() {
+                println!("msg: '{}'", msg);
 
-            if msg == "STOP" {
-                handle.spawn(
-                    send_cmd
-                        .send(zmq::Message::from_slice(b"").unwrap())
-                        .map_err(|_| ()),
-                );
+                if msg == "STOP" {
+                    handle.spawn(
+                        send_cmd
+                            .send({
+                                let mut multipart = VecDeque::new();
+                                let msg = zmq::Message::from_slice(b"").unwrap();
+                                multipart.push_back(msg);
+                                multipart
+                            })
+                            .map_err(|_| ()),
+                    );
+                }
             }
+        }
 
-            Ok(())
-        });
+        Ok(())
+    });
 
     core.run(process).unwrap();
 }

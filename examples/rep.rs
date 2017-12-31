@@ -17,71 +17,43 @@
  * along with ZeroMQ Futures.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#![feature(try_from)]
+
 extern crate futures;
 extern crate tokio_core;
 extern crate zmq;
-extern crate zmq_futures;
+extern crate tokio_zmq;
+extern crate log;
+extern crate env_logger;
 
-use std::io;
-use std::string::FromUtf8Error;
+use std::rc::Rc;
+use std::convert::TryInto;
 
-use futures::{Future, Stream};
+use futures::Stream;
 use tokio_core::reactor::Core;
-use zmq_futures::{Handler, Runner, Rep};
-use zmq_futures::service::response::Singleton;
-use zmq_futures::async::MsgStream;
-
-#[derive(Debug)]
-pub enum Error {
-    Zmq(zmq::Error),
-    Io(io::Error),
-    Utf8(FromUtf8Error),
-}
-
-impl From<zmq::Error> for Error {
-    fn from(e: zmq::Error) -> Self {
-        Error::Zmq(e)
-    }
-}
-
-impl From<io::Error> for Error {
-    fn from(e: io::Error) -> Self {
-        Error::Io(e)
-    }
-}
-
-impl From<FromUtf8Error> for Error {
-    fn from(e: FromUtf8Error) -> Self {
-        Error::Utf8(e)
-    }
-}
-
-#[derive(Clone)]
-pub struct Echo;
-
-impl Handler for Echo {
-    type Request = MsgStream<Self::Error>;
-    type Response = Singleton<Self::Error>;
-    type Error = Error;
-
-    type Future = Box<Future<Item = Self::Response, Error = Self::Error>>;
-
-    fn call(&self, req: Self::Request) -> Self::Future {
-        let res = req.map(|msg| msg.to_vec()).concat2().and_then(|msg| {
-            let msg = String::from_utf8(msg)?;
-            println!("Received: '{}'", msg);
-            Ok(zmq::Message::from_slice(msg.as_bytes())?.into())
-        });
-
-        Box::new(res)
-    }
-}
+use tokio_zmq::{SinkSocket, Socket, StreamSocket, Rep, Error};
 
 fn main() {
+    env_logger::init().unwrap();
+
     let mut core = Core::new().unwrap();
-    let zmq = Rep::new().bind("tcp://*:5560").build().unwrap();
+    let handle = core.handle();
+    let ctx = Rc::new(zmq::Context::new());
+    let rep: Rep = Socket::new(ctx, handle)
+        .bind("tcp://*:5560".into())
+        .try_into()
+        .unwrap();
 
-    let runner = Runner::new(&zmq, &zmq, Echo);
+    let runner = rep.stream()
+        .map(|multipart| {
+            for msg in &multipart {
+                if let Some(s) = msg.as_str() {
+                    println!("RECEIVED: {}", s);
+                }
+            }
+            multipart
+        })
+        .forward(rep.sink::<Error>());
 
-    core.run(runner.run()).unwrap();
+    core.run(runner).unwrap();
 }

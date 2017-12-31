@@ -17,32 +17,39 @@
  * along with ZeroMQ Futures.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#![feature(try_from)]
+
 extern crate futures;
 extern crate tokio_core;
 extern crate zmq;
-extern crate zmq_futures;
+extern crate tokio_zmq;
+
+use std::rc::Rc;
+use std::convert::TryInto;
 
 use futures::Stream;
 use tokio_core::reactor::Core;
-use zmq_futures::sub::Sub;
-use zmq_futures::StreamSocket;
+use tokio_zmq::{Socket, StreamSocket, Sub};
 
 fn main() {
     let mut core = Core::new().unwrap();
-    let conn = Sub::new()
-        .connect("tcp://localhost:5556")
-        .more()
-        .filter(b"H")
+    let handle = core.handle();
+    let ctx = Rc::new(zmq::Context::new());
+    let sub: Sub = Socket::new(ctx, handle)
+        .connect("tcp://localhost:5556".into())
+        .filter(Vec::new())
+        .try_into()
         .unwrap();
 
-    let consumer = conn.stream::<zmq::Error>()
-        .and_then(|msg| msg.map(|msg| msg.to_vec()).concat2())
-        .for_each(|msg| {
-            let msg = String::from_utf8(msg).unwrap();
-            println!("Received: '{}'", msg);
+    let consumer = sub.stream().for_each(|multipart| {
+        for msg in multipart {
+            if let Some(msg) = msg.as_str() {
+                println!("Received: {}", msg);
+            }
+        }
 
-            Ok(())
-        });
+        Ok(())
+    });
 
     core.run(consumer).unwrap();
 }

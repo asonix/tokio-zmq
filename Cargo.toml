@@ -1,7 +1,7 @@
 [package]
-name = "zmq-futures"
-description = "Provides Futures abstraction for ZeroMQ"
-repository = "https://github.com/asonix/zmq-futures"
+name = "tokio-zmq"
+description = "Provides Futures abstractions for ZeroMQ on the Tokio event-loop"
+repository = "https://github.com/asonix/tokio-zmq"
 version = "0.1.0"
 authors = ["Riley Trautman <asonix.dev@gmail.com>"]
 license = "GPL-3.0"
@@ -10,4 +10,8 @@ license = "GPL-3.0"
 zmq = "0.8"
 futures = "0.1"
 tokio-core = "0.1"
-zmq-futures-derive = { path = "zmq-futures-derive" }
+tokio-file-unix = "0.4"
+log = "0.4"
+
+[dev-dependencies]
+env_logger = "0.4"

@@ -17,24 +17,34 @@
  * along with ZeroMQ Futures.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#![feature(try_from)]
+
 extern crate futures;
 extern crate tokio_core;
 extern crate zmq;
-extern crate zmq_futures;
+extern crate tokio_zmq;
 
 use std::io;
+use std::rc::Rc;
 use std::time::Duration;
+use std::convert::TryInto;
+use std::collections::VecDeque;
 
 use futures::Stream;
 use tokio_core::reactor::{Core, Interval};
-use zmq_futures::Pub;
-use zmq_futures::SinkSocket;
-use zmq_futures::service::response::Singleton;
+use tokio_zmq::{Error as ZmqFutError, Pub, SinkSocket, Socket};
 
 #[derive(Debug)]
 enum Error {
+    ZmqFut(ZmqFutError),
     Zmq(zmq::Error),
     Io(io::Error),
+}
+
+impl From<ZmqFutError> for Error {
+    fn from(e: ZmqFutError) -> Self {
+        Error::ZmqFut(e)
+    }
 }
 
 impl From<zmq::Error> for Error {
@@ -51,9 +61,12 @@ impl From<io::Error> for Error {
 
 fn main() {
     let mut core = Core::new().unwrap();
-    let conn = Pub::new().bind("tcp://*:5556").build().unwrap();
-
-    println!("Got zmq");
+    let handle = core.handle();
+    let ctx = Rc::new(zmq::Context::new());
+    let zpub: Pub = Socket::new(ctx, handle)
+        .bind("tcp://*:5556".into())
+        .try_into()
+        .unwrap();
 
     let producer = Interval::new(Duration::from_secs(1), &core.handle())
         .unwrap()
@@ -62,9 +75,13 @@ fn main() {
             println!("Sending 'Hello'");
             zmq::Message::from_slice(b"Hello")
                 .map_err(Error::from)
-                .map(|msg| msg.into())
+                .map(|msg| {
+                    let mut multipart = VecDeque::new();
+                    multipart.push_back(msg);
+                    multipart
+                })
         })
-        .forward(conn.sink::<Singleton<Error>, Error>());
+        .forward(zpub.sink::<Error>());
 
     core.run(producer).unwrap();
 }

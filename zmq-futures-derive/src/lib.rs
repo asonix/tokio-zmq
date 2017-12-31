@@ -37,18 +37,28 @@ fn controlled_builder(ast: &syn::DeriveInput, custom: bool) -> quote::Tokens {
     let custom_builder_name = syn::Ident::from(format!("{}CustomBuilder", name));
 
     let base = quote! {
-        pub struct #name {
+        pub struct #name<S>
+        where
+            S: StreamSocket,
+        {
             sock: Rc<zmq::Socket>,
-            controller: Rc<zmq::Socket>,
+            fd: RawFd,
+            controller: Rc<S>,
         }
 
-        impl ::ZmqSocket for #name {
+        impl<S> ::ZmqSocket for #name<S>
+        where
+            S: StreamSocket,
+        {
             fn socket(&self) -> Rc<zmq::Socket> {
                 Rc::clone(&self.sock)
             }
         }
 
-        impl ::Controlled for #name {
+        impl<S> ::Controlled for #name<S>
+        where
+            S: StreamSocket,
+        {
             fn controlled_stream<C, E>(&self, handler: C) -> ZmqControlledStream<C, E>
             where
                 C: ControlHandler,
@@ -63,26 +73,26 @@ fn controlled_builder(ast: &syn::DeriveInput, custom: bool) -> quote::Tokens {
         impl #name {
             pub fn new<S>(controller: S) -> #builder_name
             where
-                S: ZmqSocket + StreamSocket,
+                S: ZmqSocket + ZmqFd + StreamSocket,
             {
                 #builder_name::new(controller)
             }
         }
 
         pub enum #builder_name {
-            Sock(Rc<zmq::Socket>, Rc<zmq::Socket>),
+            Sock(Rc<zmq::Socket>, Rc<zmq::Socket>, RawFd),
             Fail(zmq::Error),
         }
 
         impl #builder_name {
             pub fn new<S>(controller: S) -> Self
             where
-                S: ZmqSocket + StreamSocket,
+                S: ZmqSocket + ZmqFd + StreamSocket,
             {
                 let ctx = zmq::Context::new();
 
                 match ctx.socket(#socket_type) {
-                    Ok(sock) => #builder_name::Sock(Rc::new(sock), controller.socket()),
+                    Ok(sock) => #builder_name::Sock(Rc::new(sock), controller.socket(), controller.fd()),
                     Err(e) => #builder_name::Fail(e),
                 }
             }
@@ -182,7 +192,10 @@ fn controlled_builder(ast: &syn::DeriveInput, custom: bool) -> quote::Tokens {
 
                 pub fn build(self) -> zmq::Result<#name> {
                     match self {
-                        #bind_builder_name::Sock(sock, controller) => Ok(#name { sock, controller }),
+                        #bind_builder_name::Sock(sock, controller) => {
+                            let fd = sock.get_fd()?;
+                            Ok(#name { sock, controller, fd })
+                        }
                         #bind_builder_name::Fail(e) => Err(e),
                     }
                 }
@@ -203,7 +216,10 @@ fn controlled_builder(ast: &syn::DeriveInput, custom: bool) -> quote::Tokens {
 
                 pub fn build(self) -> zmq::Result<#name> {
                     match self {
-                        #connect_builder_name::Sock(sock, controller) => Ok(#name { sock, controller }),
+                        #connect_builder_name::Sock(sock, controller) => {
+                            let fd = sock.get_fd()?;
+                            Ok(#name { sock, controller, fd })
+                        }
                         #connect_builder_name::Fail(e) => Err(e),
                     }
                 }
@@ -350,7 +366,10 @@ fn expand_builder(ast: &syn::DeriveInput, custom: bool) -> quote::Tokens {
 
                 pub fn build(self) -> zmq::Result<#name> {
                     match self {
-                        #bind_builder_name::Sock(sock) => Ok(#name { sock }),
+                        #bind_builder_name::Sock(sock) => {
+                            let fd = sock.get_fd()?;
+                            Ok(#name { sock, fd })
+                       },
                         #bind_builder_name::Fail(e) => Err(e),
                     }
                 }
@@ -371,7 +390,10 @@ fn expand_builder(ast: &syn::DeriveInput, custom: bool) -> quote::Tokens {
 
                 pub fn build(self) -> zmq::Result<#name> {
                     match self {
-                        #connect_builder_name::Sock(sock) => Ok(#name { sock }),
+                        #connect_builder_name::Sock(sock) => {
+                            let fd = sock.get_fd()?;
+                            Ok(#name { sock, fd })
+                        },
                         #connect_builder_name::Fail(e) => Err(e),
                     }
                 }
@@ -412,6 +434,59 @@ fn expand_stream_socket(ast: &syn::DeriveInput) -> quote::Tokens {
     quote! {
         impl #impl_generics ::StreamSocket for #name #ty_generics #where_clause {}
     }
+}
+
+#[proc_macro_derive(ZmqFd)]
+pub fn zmq_fd(input: TokenStream) -> TokenStream {
+    let source = input.to_string();
+    let ast = syn::parse_derive_input(&source).unwrap();
+    let expanded = expand_fd_field(&ast);
+    quote!(#expanded).to_string().parse().unwrap()
+}
+
+fn expand_fd_field(ast: &syn::DeriveInput) -> quote::Tokens {
+    let s = match ast.body {
+        syn::Body::Struct(ref data) => data,
+        syn::Body::Enum(_) => panic!("Cannot derive Socket for enums"),
+    };
+
+    let f = match *s {
+        syn::VariantData::Struct(ref fields) => fields,
+        syn::VariantData::Tuple(ref fields) => fields,
+        syn::VariantData::Unit => panic!("Cannot derive Socket for Unit structs"),
+    };
+
+    let name = &ast.ident;
+    let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
+
+    let mut count = 0;
+    for field in f {
+        if let Some(item) = get_last_path_item(&field.ty) {
+            if item.ident = syn::Ident::from("RawFd") {
+                if let Some(ref field_ident) = field.ident {
+                    return quote! {
+                        impl #impl_generics ::ZmqFd for #name #ty_generics #where_clause {
+                            fn fd(&self) -> RawFd {
+                                Rc::clone(&self.#field_ident)
+                            }
+                        }
+                    };
+                } else {
+                    return quote! {
+                        impl #impl_generics ::ZmqFd for #name #ty_generics #where_clause {
+                            fn socket(&self) -> RawFd {
+                                Rc::clone(&self.#count)
+                            }
+                        }
+                    };
+                }
+            }
+        }
+
+        count += 1;
+    }
+
+    panic!("No socket type found in struct");
 }
 
 #[proc_macro_derive(ZmqSocket)]
