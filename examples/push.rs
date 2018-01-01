@@ -17,25 +17,35 @@
  * along with ZeroMQ Futures.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#![feature(try_from)]
+
 extern crate futures;
 extern crate tokio_core;
 extern crate zmq;
-extern crate zmq_futures;
+extern crate tokio_zmq;
 
 use std::io;
+use std::rc::Rc;
 use std::time::Duration;
+use std::convert::TryInto;
+use std::collections::VecDeque;
 
 use futures::{Future, Stream};
 use futures::stream::iter_ok;
 use tokio_core::reactor::{Core, Interval};
-use zmq_futures::Push;
-use zmq_futures::SinkSocket;
-use zmq_futures::service::response::Singleton;
+use tokio_zmq::{Error as ZmqFutError, Push, SinkSocket, Socket};
 
 #[derive(Debug)]
 enum Error {
+    ZmqFut(ZmqFutError),
     Zmq(zmq::Error),
     Io(io::Error),
+}
+
+impl From<ZmqFutError> for Error {
+    fn from(e: ZmqFutError) -> Self {
+        Error::ZmqFut(e)
+    }
 }
 
 impl From<zmq::Error> for Error {
@@ -52,11 +62,33 @@ impl From<io::Error> for Error {
 
 fn main() {
     let mut core = Core::new().unwrap();
-    let workers = Push::new().bind("tcp://*:5557").build().unwrap();
-    let sink = Push::new().connect("tcp://localhost:5558").build().unwrap();
+    let handle = core.handle();
+    let ctx = Rc::new(zmq::Context::new());
+    let workers: Push = Socket::new(ctx.clone(), handle.clone())
+        .bind("tcp://*:5557".into())
+        .try_into()
+        .unwrap();
+    let sink: Push = Socket::new(ctx, handle.clone())
+        .connect("tcp://localhost:5558".into())
+        .try_into()
+        .unwrap();
 
-    let start_msg = zmq::Message::from_slice(b"START").unwrap();
-    let stop_msg = zmq::Message::from_slice(b"STOP").unwrap();
+    let start_msg = {
+        let msg = zmq::Message::from_slice(b"START").unwrap();
+
+        let mut multipart = VecDeque::new();
+        multipart.push_back(msg);
+
+        multipart
+    };
+    let stop_msg = {
+        let msg = zmq::Message::from_slice(b"STOP").unwrap();
+
+        let mut multipart = VecDeque::new();
+        multipart.push_back(msg);
+
+        multipart
+    };
 
     let interval = Interval::new(Duration::from_millis(200), &core.handle()).unwrap();
 
@@ -71,9 +103,12 @@ fn main() {
                 let msg = msg.as_bytes();
                 let msg = zmq::Message::from_slice(msg)?;
 
-                Ok(msg.into())
+                let mut multipart = VecDeque::new();
+                multipart.push_back(msg);
+
+                Ok(multipart)
             })
-            .forward(workers.sink::<Singleton<Error>, Error>())
+            .forward(workers.sink::<Error>())
             .and_then(move |_| sink.send(stop_msg).map_err(Error::from))
     });
 

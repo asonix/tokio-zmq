@@ -17,27 +17,34 @@
  * along with ZeroMQ Futures.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::rc::Rc;
+use std::convert::TryFrom;
 
 use zmq;
 
-use super::{StreamSocket, ZmqSocket};
-use async::stream::{ControlHandler, ZmqControlledStream};
+use socket::config::SockConfig;
+use socket::{AsSocket, FutureSocket, Socket};
+use error::Error;
 
-#[derive(ZmqSocket, SinkSocket, StreamSocket, Builder, Controlled)]
-pub struct Pull {
-    sock: Rc<zmq::Socket>,
+pub struct Req {
+    inner: Socket,
 }
 
-impl Pull {
-    pub fn new() -> PullBuilder {
-        PullBuilder::new()
+impl AsSocket for Req {
+    fn socket(&self) -> &Socket {
+        &self.inner
     }
 
-    pub fn controlled<S>(controller: S) -> PullControlledBuilder
-    where
-        S: StreamSocket + ZmqSocket,
-    {
-        PullControlledBuilder::new(controller)
+    fn into_socket(self) -> Socket {
+        self.inner
+    }
+}
+
+impl FutureSocket for Req {}
+
+impl TryFrom<SockConfig> for Req {
+    type Error = Error;
+
+    fn try_from(conf: SockConfig) -> Result<Self, Self::Error> {
+        Ok(Req { inner: conf.build(zmq::REQ)? })
     }
 }

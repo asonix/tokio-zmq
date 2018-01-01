@@ -17,31 +17,34 @@
  * along with ZeroMQ Futures.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::marker::PhantomData;
+use std::convert::TryFrom;
 
 use zmq;
-use futures::{Async, Poll, Stream, task};
 
-pub struct Singleton<E> {
-    inner: Option<zmq::Message>,
-    phantom: PhantomData<E>,
+use socket::config::SockConfig;
+use socket::{AsSocket, SinkSocket, Socket};
+use error::Error;
+
+pub struct Pub {
+    inner: Socket,
 }
 
-impl<E> From<zmq::Message> for Singleton<E> {
-    fn from(msg: zmq::Message) -> Self {
-        Singleton {
-            inner: Some(msg),
-            phantom: PhantomData,
-        }
+impl AsSocket for Pub {
+    fn socket(&self) -> &Socket {
+        &self.inner
+    }
+
+    fn into_socket(self) -> Socket {
+        self.inner
     }
 }
 
-impl<E> Stream for Singleton<E> {
-    type Item = zmq::Message;
-    type Error = E;
+impl SinkSocket for Pub {}
 
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        task::current().notify();
-        Ok(Async::Ready(self.inner.take()))
+impl TryFrom<SockConfig> for Pub {
+    type Error = Error;
+
+    fn try_from(conf: SockConfig) -> Result<Self, Self::Error> {
+        Ok(Pub { inner: conf.build(zmq::PUB)? })
     }
 }

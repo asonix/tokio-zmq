@@ -17,8 +17,23 @@
  * along with ZeroMQ Futures.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-mod envelope;
-mod singleton;
+use std::io::Error as IoError;
+use zmq::Error as ZmqError;
 
-pub use self::envelope::Envelope;
-pub use self::singleton::Singleton;
+#[derive(Debug)]
+pub enum Error {
+    Zmq(ZmqError),
+    Io(IoError),
+}
+
+impl From<ZmqError> for Error {
+    fn from(e: ZmqError) -> Self {
+        Error::Zmq(e)
+    }
+}
+
+impl From<IoError> for Error {
+    fn from(e: IoError) -> Self {
+        Error::Io(e)
+    }
+}

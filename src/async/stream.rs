@@ -18,226 +18,109 @@
  */
 
 use std::rc::Rc;
-use std::fmt;
-use std::marker::PhantomData;
 
 use zmq;
+use tokio_core::reactor::PollEvented;
+use tokio_file_unix::File;
 use futures::{Async, Future, Poll, Stream};
-use futures::stream::Collect;
-use futures::task;
 
-#[derive(Clone)]
-pub struct MsgStream<E>
-where
-    E: From<zmq::Error>,
-{
-    socket: Option<Rc<zmq::Socket>>,
-    phantom: PhantomData<E>,
+use async::future::MultipartResponse;
+use error::Error;
+use super::Multipart;
+use ZmqFile;
+
+pub struct MultipartStream {
+    response: Option<MultipartResponse>,
+    // To read data
+    sock: Rc<zmq::Socket>,
+    // Handles notifications to/from the event loop
+    file: Rc<PollEvented<File<ZmqFile>>>,
 }
 
-impl<E> MsgStream<E>
-where
-    E: From<zmq::Error>,
-{
-    pub fn new(sock: Rc<zmq::Socket>) -> Self {
-        MsgStream {
-            socket: Some(sock),
-            phantom: PhantomData,
+impl MultipartStream {
+    pub fn new(sock: Rc<zmq::Socket>, file: Rc<PollEvented<File<ZmqFile>>>) -> Self {
+        MultipartStream {
+            response: None,
+            sock: sock,
+            file: file,
         }
     }
 
-    fn next_message(&mut self) -> Result<Async<Option<zmq::Message>>, E> {
-        let socket = match self.socket.take() {
-            Some(socket) => socket,
-            None => return Ok(Async::Ready(None)),
-        };
-
-        let mut items = [socket.as_poll_item(zmq::POLLIN)];
-
-        // Don't block waiting for an item to become ready
-        let event_count = zmq::poll(&mut items, 0)?;
-        if event_count == 0 {
-            task::current().notify();
-            self.socket = Some(Rc::clone(&socket));
-            return Ok(Async::NotReady);
-        }
-
-        let mut msg = zmq::Message::new().unwrap();
-
-        for item in items.iter() {
-            if item.is_readable() {
-                match socket.recv(&mut msg, zmq::DONTWAIT) {
-                    Ok(_) => {
-                        task::current().notify();
-                        if msg.get_more() {
-                            self.socket = Some(Rc::clone(&socket));
-                        }
-                        return Ok(Async::Ready(Some(msg)));
-                    }
-                    Err(zmq::Error::EAGAIN) => (),
-                    Err(err) => {
-                        return Err(err.into());
-                    }
-                }
+    fn poll_response(&mut self, mut response: MultipartResponse) -> Poll<Option<Multipart>, Error> {
+        match response.poll()? {
+            Async::Ready(item) => Ok(Async::Ready(Some(item))),
+            Async::NotReady => {
+                self.response = Some(response);
+                Ok(Async::NotReady)
             }
         }
-
-        self.socket = Some(Rc::clone(&socket));
-
-        task::current().notify();
-        Ok(Async::NotReady)
     }
 }
 
-impl<E> Stream for MsgStream<E>
-where
-    E: From<zmq::Error>,
-{
-    type Item = zmq::Message;
-    type Error = E;
+impl Stream for MultipartStream {
+    type Item = Multipart;
+    type Error = Error;
 
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        self.next_message()
-    }
-}
-
-#[derive(Clone)]
-pub struct ZmqStream<E>
-where
-    E: From<zmq::Error>,
-{
-    socket: Rc<zmq::Socket>,
-    phantom: PhantomData<E>,
-}
-
-impl<E> ZmqStream<E>
-where
-    E: From<zmq::Error>,
-{
-    pub fn new(sock: Rc<zmq::Socket>) -> Self {
-        ZmqStream {
-            socket: sock,
-            phantom: PhantomData,
+    fn poll(&mut self) -> Poll<Option<Multipart>, Error> {
+        if let Some(response) = self.response.take() {
+            self.poll_response(response)
+        } else {
+            let response = MultipartResponse::new(Rc::clone(&self.sock), Rc::clone(&self.file));
+            self.poll_response(response)
         }
-    }
-
-    fn next_message(&self) -> Async<Option<MsgStream<E>>> {
-        Async::Ready(Some(MsgStream::new(Rc::clone(&self.socket))))
-    }
-}
-
-impl<E> Stream for ZmqStream<E>
-where
-    E: From<zmq::Error>,
-{
-    type Item = MsgStream<E>;
-    type Error = E;
-
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        Ok(self.next_message())
-    }
-}
-
-impl<E> fmt::Debug for ZmqStream<E>
-where
-    E: From<zmq::Error>,
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "ZmqStream")
     }
 }
 
 pub trait ControlHandler {
-    type Request: From<Vec<zmq::Message>>;
-
-    fn should_stop(&self, msg: Self::Request) -> bool;
+    fn should_stop(&self, multipart: Multipart) -> bool;
 }
 
-pub struct ZmqControlledStream<C, E>
+pub struct ControlledStream<H>
 where
-    C: ControlHandler,
-    E: From<zmq::Error>,
+    H: ControlHandler,
 {
-    socket: Rc<zmq::Socket>,
-    control: Rc<zmq::Socket>,
-    control_handler: C,
-    control_stream: Option<Collect<MsgStream<E>>>,
-    phantom: PhantomData<E>,
+    stream: MultipartStream,
+    control: MultipartStream,
+    handler: H,
 }
 
-impl<C, E> ZmqControlledStream<C, E>
+impl<H> ControlledStream<H>
 where
-    C: ControlHandler,
-    E: From<zmq::Error>,
+    H: ControlHandler,
 {
-    pub fn new(sock: Rc<zmq::Socket>, control: Rc<zmq::Socket>, control_handler: C) -> Self {
-        ZmqControlledStream {
-            socket: sock,
-            control: control,
-            control_handler: control_handler,
-            control_stream: None,
-            phantom: PhantomData,
+    pub fn new(
+        sock: Rc<zmq::Socket>,
+        file: Rc<PollEvented<File<ZmqFile>>>,
+        control_sock: Rc<zmq::Socket>,
+        control_file: Rc<PollEvented<File<ZmqFile>>>,
+        handler: H,
+    ) -> Self {
+        ControlledStream {
+            stream: MultipartStream::new(sock, file),
+            control: MultipartStream::new(control_sock, control_file),
+            handler: handler,
         }
     }
+}
 
-    fn next_message(&mut self) -> Result<Async<Option<MsgStream<E>>>, E> {
-        let ctrl_stream = self.control_stream.take();
+impl<H> Stream for ControlledStream<H>
+where
+    H: ControlHandler,
+{
+    type Item = Multipart;
+    type Error = Error;
 
-        if let Some(mut ctrl_stream) = ctrl_stream {
-            match ctrl_stream.poll()? {
-                Async::Ready(ctrl_vec) => {
-                    if self.control_handler.should_stop(ctrl_vec.into()) {
-                        return Ok(Async::Ready(None));
-                    }
-                }
-                Async::NotReady => {
-                    self.control_stream = Some(ctrl_stream);
-                    task::current().notify();
-                    return Ok(Async::NotReady);
-                }
-            }
+    fn poll(&mut self) -> Poll<Option<Multipart>, Error> {
+        let stop = match self.control.poll()? {
+            Async::NotReady => false,
+            Async::Ready(None) => false,
+            Async::Ready(Some(multipart)) => self.handler.should_stop(multipart),
+        };
+
+        if stop {
+            Ok(Async::Ready(None))
         } else {
-            let mut items = [self.control.as_poll_item(zmq::POLLIN)];
-
-            if zmq::poll(&mut items, 0)? != 0 {
-                let sock = Rc::clone(&self.control);
-                let ctrl_stream = MsgStream::new(sock).collect();
-
-                self.control_stream = Some(ctrl_stream);
-                task::current().notify();
-                return Ok(Async::NotReady);
-            }
+            self.stream.poll()
         }
-
-        let mut items = [self.socket.as_poll_item(zmq::POLLIN)];
-        if zmq::poll(&mut items, 1)? != 0 {
-            Ok(Async::Ready(Some(MsgStream::new(Rc::clone(&self.socket)))))
-        } else {
-            task::current().notify();
-            Ok(Async::NotReady)
-        }
-    }
-}
-
-impl<C, E> Stream for ZmqControlledStream<C, E>
-where
-    C: ControlHandler,
-    E: From<zmq::Error>,
-{
-    type Item = MsgStream<E>;
-    type Error = E;
-
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        self.next_message()
-    }
-}
-
-impl<C, E> fmt::Debug for ZmqControlledStream<C, E>
-where
-    C: ControlHandler,
-    E: From<zmq::Error>,
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "ZmqControlledStream")
     }
 }

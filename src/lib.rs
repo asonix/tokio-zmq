@@ -18,69 +18,41 @@
  */
 
 #![feature(conservative_impl_trait)]
+#![feature(try_from)]
 
 extern crate zmq;
-#[macro_use]
-extern crate zmq_futures_derive;
 extern crate futures;
-
-pub mod service;
+extern crate tokio_core;
+extern crate tokio_file_unix;
+#[macro_use]
+extern crate log;
 
 pub mod async;
-pub mod rep;
-pub mod req;
-pub mod zpub;
-pub mod sub;
-pub mod push;
-pub mod pull;
+pub mod error;
+pub mod socket;
 
-pub use self::rep::Rep;
-pub use self::req::Req;
-pub use self::zpub::Pub;
-pub use self::sub::Sub;
-pub use self::push::Push;
-pub use self::pull::Pull;
-pub use self::service::{Handler, Runner};
+pub use async::ControlHandler;
+pub use self::error::Error;
+pub use socket::{AsSocket, FutureSocket, SinkSocket, Socket, StreamSocket};
+pub use socket::{Rep, Req, Pub, Sub, Push, Pull, Xpub, Xsub, Pair};
+pub use socket::{RepControlled, SubControlled, PullControlled, XpubControlled, XsubControlled,
+                 PairControlled};
+pub use socket::ControlledStreamSocket;
 
-use self::async::{ZmqRequest, ZmqResponse, ZmqSink, ZmqStream, ControlHandler};
-use futures::Stream;
+use std::os::unix::io::{AsRawFd, RawFd};
 
-use std::rc::Rc;
-
-pub trait ZmqSocket {
-    fn socket(&self) -> Rc<zmq::Socket>;
+pub struct ZmqFile {
+    fd: RawFd,
 }
 
-pub trait StreamSocket: ZmqSocket {
-    fn recv(&self) -> async::ZmqResponse {
-        ZmqResponse::new(self.socket())
-    }
-
-    fn stream<E>(&self) -> async::ZmqStream<E>
-    where
-        E: From<zmq::Error>,
-    {
-        ZmqStream::new(self.socket())
+impl ZmqFile {
+    fn from_raw_fd(fd: RawFd) -> Self {
+        ZmqFile { fd }
     }
 }
 
-pub trait Controlled: ZmqSocket {
-    fn controlled_stream<C, E>(&self, handler: C) -> async::ZmqControlledStream<C, E>
-    where
-        C: ControlHandler,
-        E: From<zmq::Error>;
-}
-
-pub trait SinkSocket: ZmqSocket {
-    fn send(&self, msg: zmq::Message) -> ZmqRequest {
-        ZmqRequest::new(self.socket(), msg)
-    }
-
-    fn sink<S, E>(&self) -> async::ZmqSink<S, E>
-    where
-        S: Stream<Item = zmq::Message, Error = E>,
-        E: From<zmq::Error>,
-    {
-        ZmqSink::new(self.socket())
+impl AsRawFd for ZmqFile {
+    fn as_raw_fd(&self) -> RawFd {
+        self.fd
     }
 }

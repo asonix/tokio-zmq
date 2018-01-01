@@ -17,10 +17,16 @@
  * along with ZeroMQ Futures.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-pub mod stream;
-pub mod sink;
 pub mod future;
+pub mod sink;
+pub mod stream;
 
-pub use self::stream::{MsgStream, ZmqStream, ControlHandler, ZmqControlledStream};
-pub use self::sink::ZmqSink;
-pub use self::future::{ZmqRequest, ZmqResponse};
+use std::collections::VecDeque;
+
+use zmq;
+
+pub use self::future::{MultipartRequest, MultipartResponse};
+pub use self::sink::MultipartSink;
+pub use self::stream::{ControlledStream, ControlHandler, MultipartStream};
+
+pub type Multipart = VecDeque<zmq::Message>;

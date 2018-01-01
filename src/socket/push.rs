@@ -17,17 +17,34 @@
  * along with ZeroMQ Futures.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::rc::Rc;
+use std::convert::TryFrom;
 
 use zmq;
 
-#[derive(ZmqSocket, SinkSocket, StreamSocket, Builder)]
+use socket::config::SockConfig;
+use socket::{AsSocket, SinkSocket, Socket};
+use error::Error;
+
 pub struct Push {
-    sock: Rc<zmq::Socket>,
+    inner: Socket,
 }
 
-impl Push {
-    pub fn new() -> PushBuilder {
-        PushBuilder::new()
+impl AsSocket for Push {
+    fn socket(&self) -> &Socket {
+        &self.inner
+    }
+
+    fn into_socket(self) -> Socket {
+        self.inner
+    }
+}
+
+impl SinkSocket for Push {}
+
+impl TryFrom<SockConfig> for Push {
+    type Error = Error;
+
+    fn try_from(conf: SockConfig) -> Result<Self, Self::Error> {
+        Ok(Push { inner: conf.build(zmq::PUSH)? })
     }
 }
