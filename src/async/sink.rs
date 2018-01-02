@@ -112,6 +112,7 @@ where
 
         // Double check that the socket is ready for writing
         if events & zmq::POLLOUT == 0 {
+            /*
             if events & zmq::POLLIN != 0 {
                 self.file.need_read();
                 debug!(
@@ -129,6 +130,14 @@ where
                 );
                 return Ok(AsyncSink::NotReady(msg));
             }
+            */
+            self.file.need_write();
+            debug!(
+                "MultipartSink: Events does not indicate POLLOUT: e{} != p{}",
+                events,
+                zmq::POLLOUT
+            );
+            return Ok(AsyncSink::NotReady(msg));
         }
 
         let flags = zmq::DONTWAIT |
@@ -170,6 +179,7 @@ where
     fn flush(&mut self) -> Result<Async<()>, E> {
         debug!("MultipartSink: In flush");
         loop {
+            debug!("MultipartSink: loop");
             if let Some(mut multipart) = self.multipart.take() {
                 if let Some(curr_msg) = multipart.pop_front() {
                     debug!("MultipartSink: Sending current message");
@@ -189,6 +199,7 @@ where
                                 continue;
                                 // return Ok(Async::NotReady);
                             }
+                            debug!("Breaking loop");
                             break;
                         }
                         AsyncSink::NotReady(curr_msg) => {
@@ -202,9 +213,12 @@ where
                     }
                 } else {
                     self.multipart = None;
+                    debug!("MultipartSink: missing message, Breaking loop");
+                    task::current().notify();
                     break;
                 }
             } else {
+                debug!("MultipartSink: no multipart, Breaking loop");
                 break;
             }
         }
@@ -219,7 +233,7 @@ where
             let events = self.sock.get_events().map_err(Error::from)? as i16;
             if events & zmq::POLLOUT != 0 {
                 // manually schedule a wakeup and procede
-                debug!("Write ready, but file doesn't think so");
+                debug!("MultipartSink: Write ready, but file doesn't think so");
                 task::current().notify();
             } else {
                 return Ok(false);

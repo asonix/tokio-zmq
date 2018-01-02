@@ -26,20 +26,20 @@ use prelude::*;
 use socket::{ControlledSocket, Socket};
 use error::Error;
 
-pub struct Xsub {
+pub struct Dealer {
     inner: Socket,
 }
 
-impl Xsub {
-    pub fn control<S>(self, control: S) -> XsubControlled
+impl Dealer {
+    pub fn controlled<S>(self, control: S) -> DealerControlled
     where
         S: StreamSocket,
     {
-        XsubControlled { inner: self.inner.controlled(control) }
+        DealerControlled { inner: self.inner.controlled(control) }
     }
 }
 
-impl AsSocket for Xsub {
+impl AsSocket for Dealer {
     fn socket(&self) -> &Socket {
         &self.inner
     }
@@ -49,31 +49,31 @@ impl AsSocket for Xsub {
     }
 }
 
-impl StreamSocket for Xsub {}
-impl SinkSocket for Xsub {}
+impl StreamSocket for Dealer {}
+impl SinkSocket for Dealer {}
 
-impl<'a> TryFrom<SockConfig<'a>> for Xsub {
+impl<'a> TryFrom<SockConfig<'a>> for Dealer {
     type Error = Error;
 
     fn try_from(conf: SockConfig<'a>) -> Result<Self, Self::Error> {
-        Ok(Xsub { inner: conf.build(zmq::XSUB)? })
+        Ok(Dealer { inner: conf.build(zmq::DEALER)? })
     }
 }
 
-pub struct XsubControlled {
+pub struct DealerControlled {
     inner: ControlledSocket,
 }
 
-impl AsControlledSocket for XsubControlled {
+impl AsControlledSocket for DealerControlled {
     fn socket(&self) -> &ControlledSocket {
         &self.inner
     }
 }
 
-impl<H> ControlledStreamSocket<H> for XsubControlled
+impl<H> ControlledStreamSocket<H> for DealerControlled
 where
     H: ControlHandler,
 {
 }
 
-impl ControlledSinkSocket for XsubControlled {}
+impl ControlledSinkSocket for DealerControlled {}

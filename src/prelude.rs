@@ -18,5 +18,6 @@
  */
 
 //! Re-export all important traits to make developing with this library easier
-pub use socket::{AsSocket, ControlledStreamSocket, FutureSocket, SinkSocket, StreamSocket};
+pub use socket::{AsControlledSocket, AsSocket, ControlledSinkSocket, ControlledStreamSocket,
+                 FutureSocket, SinkSocket, StreamSocket};
 pub use async::ControlHandler;

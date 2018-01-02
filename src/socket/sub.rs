@@ -22,8 +22,8 @@ use std::convert::TryFrom;
 use zmq;
 
 use socket::config::SubConfig;
-use socket::{AsSocket, ControlledSocket, ControlledStreamSocket, ControlHandler, Socket,
-             StreamSocket};
+use prelude::*;
+use socket::{ControlledSocket, Socket};
 use error::Error;
 
 pub struct Sub {
@@ -63,11 +63,14 @@ pub struct SubControlled {
     inner: ControlledSocket,
 }
 
+impl AsControlledSocket for SubControlled {
+    fn socket(&self) -> &ControlledSocket {
+        &self.inner
+    }
+}
+
 impl<H> ControlledStreamSocket<H> for SubControlled
 where
     H: ControlHandler,
 {
-    fn socket(&self) -> &ControlledSocket {
-        &self.inner
-    }
 }

@@ -25,16 +25,18 @@ use zmq;
 use tokio_core::reactor::{Handle, PollEvented};
 use tokio_file_unix::File;
 
-pub mod config;
-pub mod rep;
-pub mod req;
-pub mod zpub;
-pub mod sub;
-pub mod push;
-pub mod pull;
-pub mod xpub;
-pub mod xsub;
-pub mod pair;
+mod config;
+mod rep;
+mod req;
+mod zpub;
+mod sub;
+mod push;
+mod pull;
+mod xpub;
+mod xsub;
+mod pair;
+mod dealer;
+mod router;
 
 pub use self::rep::{Rep, RepControlled};
 pub use self::req::Req;
@@ -45,6 +47,8 @@ pub use self::pull::{Pull, PullControlled};
 pub use self::xpub::{Xpub, XpubControlled};
 pub use self::xsub::{Xsub, XsubControlled};
 pub use self::pair::{Pair, PairControlled};
+pub use self::dealer::{Dealer, DealerControlled};
+pub use self::router::{Router, RouterControlled};
 
 use self::config::SockConfigStart;
 use async::{ControlledStream, ControlHandler, Multipart, MultipartRequest, MultipartResponse,
@@ -62,16 +66,19 @@ pub trait AsSocket {
     fn into_socket(self) -> Socket;
 }
 
-/// This trait is used for types wrapping `ControlledSocket`s. It requires implementing only one
-/// method, `socket(&self)`, which is analogous to the `AsSocket` trait's `socket(&self)` method.
-pub trait ControlledStreamSocket<H>
-where
-    H: ControlHandler,
-{
+/// Analogous to the AsSocket trait, but for Controlled sockets.
+pub trait AsControlledSocket {
     /// Any implementing type must have a method of getting a reference to the inner
     /// `ControlledSocket`.
     fn socket(&self) -> &ControlledSocket;
+}
 
+/// This trait is used for types wrapping `ControlledSocket`s. It depends on the type implementing
+/// AsControlledSocket, which is analogous to the `AsSocket` trait's `socket(&self)` method.
+pub trait ControlledStreamSocket<H>: AsControlledSocket
+where
+    H: ControlHandler,
+{
     /// Receive a single multipart message from the socket.
     fn recv(&self) -> MultipartResponse {
         self.socket().recv()
@@ -86,10 +93,7 @@ where
 /// In addition to having Streams, some sockets also have Sinks. Every controlled socket has a
 /// stream, but to give Sink functionality to those that have Sinks as well, this trait is
 /// implemented.
-pub trait ControlledSinkSocket<H>: ControlledStreamSocket<H>
-where
-    H: ControlHandler,
-{
+pub trait ControlledSinkSocket: AsControlledSocket {
     /// Send a single multipart message to the socket.
     ///
     /// For example usage of `send`, see `SinkSocket`'s send definition.
@@ -108,6 +112,8 @@ where
     }
 }
 
+/// This trait provides the basic Stream support for ZeroMQ Sockets. It depends on AsSocket, but
+/// provides implementations for `sink` and `recv`.
 pub trait StreamSocket: AsSocket {
     /// Receive a single multipart message from the socket.
     ///
@@ -201,6 +207,8 @@ pub trait StreamSocket: AsSocket {
     }
 }
 
+/// This trait provides the basic Sink support for ZeroMQ Sockets. It depends on AsSocket and
+/// provides the `send` and `sink` methods.
 pub trait SinkSocket: AsSocket {
     /// Send a single multipart message to the socket.
     ///
@@ -293,6 +301,9 @@ pub trait SinkSocket: AsSocket {
     }
 }
 
+/// This trait is used for socket types that don't really fit in the context of `Stream` or `Sink`.
+/// Typically interaction with these sockets is one-off. This trait provides implementations for
+/// `send` and `recv`.
 pub trait FutureSocket: AsSocket {
     /// Send a single multipart message to the socket.
     ///
