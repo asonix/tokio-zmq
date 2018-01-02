@@ -62,7 +62,17 @@ fn main() {
         .try_into()
         .unwrap();
 
-    let runner = stream.stream(Stop).forward(sink.sink::<ZmqFutError>());
+    let runner = stream
+        .stream(Stop)
+        .map(|multipart| {
+            for msg in &multipart {
+                if let Some(msg) = msg.as_str() {
+                    println!("Relaying: {}", msg);
+                }
+            }
+            multipart
+        })
+        .forward(sink.sink::<ZmqFutError>());
 
     core.run(runner).unwrap();
 }

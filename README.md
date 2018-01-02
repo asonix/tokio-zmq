@@ -1,5 +1,8 @@
 # Tokio ZMQ
 
+[documentation](https://docs.rs/tokio-zmq/0.1.0/tokio_zmq/)
+[crates.io](https://crates.io/crates/tokio-zmq)
+
 This crate contains wrappers around ZeroMQ Concepts with Futures.
 
 Currently Supported Sockets
@@ -37,23 +40,23 @@ use tokio_zmq::{Socket, Error};
 use tokio_zmq::Rep; // the socket type you want
 
 fn main() {
-  let mut core = Core::new().unwrap();
-  let handle = core.handle();
-  let context = Rc::new(zmq::Context::new());
-  let rep: Rep = Socket::new(context, handle)
-      .bind("tcp://*:5560")
-      .try_into()
-      .unwrap()
-
-  let runner = rep.stream()
-      .and_then(|multipart| {
-          // handle the multipart (VecDeque<zmq::Message>)
-          // This example simply echos the incoming data back to the client.
-          Ok(multipart)
-      })
-      .forward(rep.sink::<Error>());
-
-  core.run(runner).unwrap();
+    let mut core = Core::new().unwrap();
+    let handle = core.handle();
+    let context = Rc::new(zmq::Context::new());
+    let rep: Rep = Socket::new(context, handle)
+        .bind("tcp://*:5560")
+        .try_into()
+        .unwrap()
+  
+    let runner = rep.stream()
+        .and_then(|multipart| {
+            // handle the multipart (VecDeque<zmq::Message>)
+            // This example simply echos the incoming data back to the client.
+            Ok(multipart)
+        })
+        .forward(rep.sink::<Error>());
+  
+    core.run(runner).unwrap();
 }
 ```
 
