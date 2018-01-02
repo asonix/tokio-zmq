@@ -17,6 +17,9 @@
  * along with Tokio ZMQ.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+//! This module defines the `MultipartSink` type. A wrapper around Sockets that implements
+//! `futures::Stream`.
+
 use std::marker::PhantomData;
 use std::rc::Rc;
 
@@ -26,16 +29,53 @@ use tokio_file_unix::File;
 use futures::{Async, AsyncSink, Poll, Sink, StartSend};
 use futures::task;
 
-use super::Multipart;
+use super::{MsgPlace, Multipart};
 use error::Error;
-use ZmqFile;
+use file::ZmqFile;
 
-#[derive(PartialEq)]
-pub enum MsgPlace {
-    Nth,
-    Last,
-}
-
+/// The `MultipartSink` Sink handles sending streams of data to ZeroMQ Sockets.
+///
+/// You shouldn't ever need to manually create one. Here's how to get one from a 'raw' `Socket`'
+/// type.
+///
+/// ### Example
+/// ```rust
+/// #![feature(conservative_impl_trait)]
+///
+/// extern crate zmq;
+/// extern crate futures;
+/// extern crate tokio_core;
+/// extern crate tokio_zmq;
+///
+/// use std::rc::Rc;
+/// use std::collections::VecDeque;
+///
+/// use futures::{Future, Sink};
+/// use tokio_core::reactor::Core;
+/// use tokio_zmq::async::{Multipart, MultipartStream};
+/// use tokio_zmq::{Error, Socket};
+///
+/// fn get_sink(socket: Socket) -> impl Sink<SinkItem = Multipart, SinkError = Error> {
+///     socket.sink()
+/// }
+///
+/// fn main() {
+///     let mut core = Core::new().unwrap();
+///     let context = Rc::new(zmq::Context::new());
+///     let socket = Socket::new(context, core.handle())
+///         .bind("tcp://*:5568")
+///         .build(zmq::PUB)
+///         .unwrap();
+///     let sink = get_sink(socket);
+///
+///     let msg = zmq::Message::from_slice(b"Some message").unwrap();
+///
+///     let mut multipart = VecDeque::new();
+///     multipart.push_back(msg);
+///
+///     core.run(sink.send(multipart)).unwrap();
+/// }
+/// ```
 pub struct MultipartSink<E>
 where
     E: From<Error>,

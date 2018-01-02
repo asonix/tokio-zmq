@@ -30,8 +30,9 @@ use std::collections::VecDeque;
 
 use futures::Stream;
 use tokio_core::reactor::Core;
+use tokio_zmq::prelude::*;
 use tokio_zmq::{Pull, PullControlled, Push, Sub};
-use tokio_zmq::{Error as ZmqFutError, ControlHandler, ControlledStreamSocket, SinkSocket, Socket};
+use tokio_zmq::{Error as ZmqFutError, Socket};
 
 pub struct Stop;
 
@@ -47,12 +48,12 @@ fn main() {
     let handle = core.handle();
     let ctx = Rc::new(zmq::Context::new());
     let cmd: Sub = Socket::new(ctx.clone(), handle.clone())
-        .connect("tcp://localhost:5559".into())
-        .filter(Vec::new())
+        .connect("tcp://localhost:5559")
+        .filter(b"")
         .try_into()
         .unwrap();
     let stream: Pull = Socket::new(ctx.clone(), handle.clone())
-        .connect("tcp://localhost:5557".into())
+        .connect("tcp://localhost:5557")
         .try_into()
         .unwrap();
     let stream: PullControlled = stream.controlled(cmd);

@@ -17,30 +17,23 @@
  * along with Tokio ZMQ.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::io::Error as IoError;
-use zmq::Error as ZmqError;
+use std::os::unix::io::{AsRawFd, RawFd};
 
-/// Defines the error type for Tokio ZMQ.
-///
-/// Errors here can come from two places, IO, and ZeroMQ. Most errors encountered in this
-/// application are ZeroMQ errors, so Error::Zmq(_) is common, although we also need to catch IO
-/// errors from Tokio's PollEvented creation and TokioFileUnix's File creation.
-#[derive(Debug)]
-pub enum Error {
-    /// Stores ZeroMQ Errors
-    Zmq(ZmqError),
-    /// Stores PollEvented and File creation errors
-    Io(IoError),
+/// Create a simple wraper struct to hand to tokio_file_unix's File new_nb constructor
+pub struct ZmqFile {
+    fd: RawFd,
 }
 
-impl From<ZmqError> for Error {
-    fn from(e: ZmqError) -> Self {
-        Error::Zmq(e)
+impl ZmqFile {
+    /// Create a ZmqFile from a file descriptor
+    pub fn from_raw_fd(fd: RawFd) -> Self {
+        ZmqFile { fd }
     }
 }
 
-impl From<IoError> for Error {
-    fn from(e: IoError) -> Self {
-        Error::Io(e)
+impl AsRawFd for ZmqFile {
+    /// ZmqFile must implement AsRawFd to be compatable with tokio_file_unix
+    fn as_raw_fd(&self) -> RawFd {
+        self.fd
     }
 }

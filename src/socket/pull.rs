@@ -51,10 +51,10 @@ impl AsSocket for Pull {
 
 impl StreamSocket for Pull {}
 
-impl TryFrom<SockConfig> for Pull {
+impl<'a> TryFrom<SockConfig<'a>> for Pull {
     type Error = Error;
 
-    fn try_from(conf: SockConfig) -> Result<Self, Self::Error> {
+    fn try_from(conf: SockConfig<'a>) -> Result<Self, Self::Error> {
         Ok(Pull { inner: conf.build(zmq::PULL)? })
     }
 }

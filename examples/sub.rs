@@ -29,15 +29,16 @@ use std::convert::TryInto;
 
 use futures::Stream;
 use tokio_core::reactor::Core;
-use tokio_zmq::{Socket, StreamSocket, Sub};
+use tokio_zmq::prelude::*;
+use tokio_zmq::{Socket, Sub};
 
 fn main() {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
     let ctx = Rc::new(zmq::Context::new());
     let sub: Sub = Socket::new(ctx, handle)
-        .connect("tcp://localhost:5556".into())
-        .filter(Vec::new())
+        .connect("tcp://localhost:5556")
+        .filter(b"")
         .try_into()
         .unwrap();
 

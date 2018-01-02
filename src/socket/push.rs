@@ -41,10 +41,10 @@ impl AsSocket for Push {
 
 impl SinkSocket for Push {}
 
-impl TryFrom<SockConfig> for Push {
+impl<'a> TryFrom<SockConfig<'a>> for Push {
     type Error = Error;
 
-    fn try_from(conf: SockConfig) -> Result<Self, Self::Error> {
+    fn try_from(conf: SockConfig<'a>) -> Result<Self, Self::Error> {
         Ok(Push { inner: conf.build(zmq::PUSH)? })
     }
 }

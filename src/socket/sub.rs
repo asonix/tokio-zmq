@@ -51,10 +51,10 @@ impl AsSocket for Sub {
 
 impl StreamSocket for Sub {}
 
-impl TryFrom<SubConfig> for Sub {
+impl<'a> TryFrom<SubConfig<'a>> for Sub {
     type Error = Error;
 
-    fn try_from(conf: SubConfig) -> Result<Self, Self::Error> {
+    fn try_from(conf: SubConfig<'a>) -> Result<Self, Self::Error> {
         Ok(Sub { inner: conf.build(zmq::SUB)? })
     }
 }

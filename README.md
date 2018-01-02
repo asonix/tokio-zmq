@@ -9,6 +9,9 @@ Currently Supported Sockets
  - SUB
  - PUSH
  - PULL
+ - XPUB
+ - XSUB
+ - PAIR
 
 See the [examples folder](https://github.com/asonix/zmq-futures/tree/master/examples) for usage examples.
 
@@ -29,7 +32,8 @@ use std::convert::TryInto;
 
 use futures::Stream;
 use tokio_core::reactor::Core;
-use tokio_zmq::{SinkSocket, Socket, StreamSocket, Error};
+use tokio_zmq::prelude::*;
+use tokio_zmq::{Socket, Error};
 use tokio_zmq::Rep; // the socket type you want
 
 fn main() {
@@ -37,7 +41,7 @@ fn main() {
   let handle = core.handle();
   let context = Rc::new(zmq::Context::new());
   let rep: Rep = Socket::new(context, handle)
-      .bind("tcp://*:5560".into())
+      .bind("tcp://*:5560")
       .try_into()
       .unwrap()
 
@@ -52,6 +56,16 @@ fn main() {
   core.run(runner).unwrap();
 }
 ```
+
+### Running the examples
+The `req.rs` and `rep.rs` examples are designed to be used together. The `rep` example starts a server with a REP socket, and the `req` example queries that server with a REQ socket.
+
+The `zpub.rs` and `sub.rs` examples should be used togheter. `zpub` produces values that `sub` consumes.
+
+The `push.rs`, `pull_push.rs`, and `pull.rs` files should be used together. `push` produces values, which are relayed by `pull_push` to `pull`, which consumes them and sends a stop signal to itself and to `pull_push`.
+
+### Contributing
+Feel free to open issues for anything you find an issue with. Please note that any contributed code will be licensed under the GPLv3.
 
 ### License
 

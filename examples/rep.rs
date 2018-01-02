@@ -31,7 +31,8 @@ use std::convert::TryInto;
 
 use futures::Stream;
 use tokio_core::reactor::Core;
-use tokio_zmq::{SinkSocket, Socket, StreamSocket, Rep, Error};
+use tokio_zmq::prelude::*;
+use tokio_zmq::{Socket, Rep, Error};
 
 fn main() {
     env_logger::init().unwrap();
@@ -40,7 +41,7 @@ fn main() {
     let handle = core.handle();
     let ctx = Rc::new(zmq::Context::new());
     let rep: Rep = Socket::new(ctx, handle)
-        .bind("tcp://*:5560".into())
+        .bind("tcp://*:5560")
         .try_into()
         .unwrap();
 

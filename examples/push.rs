@@ -33,7 +33,8 @@ use std::collections::VecDeque;
 use futures::{Future, Stream};
 use futures::stream::iter_ok;
 use tokio_core::reactor::{Core, Interval};
-use tokio_zmq::{Error as ZmqFutError, Push, SinkSocket, Socket};
+use tokio_zmq::prelude::*;
+use tokio_zmq::{Error as ZmqFutError, Push, Socket};
 
 #[derive(Debug)]
 enum Error {
@@ -65,11 +66,11 @@ fn main() {
     let handle = core.handle();
     let ctx = Rc::new(zmq::Context::new());
     let workers: Push = Socket::new(ctx.clone(), handle.clone())
-        .bind("tcp://*:5557".into())
+        .bind("tcp://*:5557")
         .try_into()
         .unwrap();
     let sink: Push = Socket::new(ctx, handle.clone())
-        .connect("tcp://localhost:5558".into())
+        .connect("tcp://localhost:5558")
         .try_into()
         .unwrap();
 

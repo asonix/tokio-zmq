@@ -22,8 +22,8 @@ use std::convert::TryFrom;
 use zmq;
 
 use socket::config::SockConfig;
-use socket::{AsSocket, ControlledSocket, ControlledStreamSocket, ControlHandler, SinkSocket,
-             Socket, StreamSocket};
+use socket::{AsSocket, ControlledSocket, ControlledSinkSocket, ControlledStreamSocket,
+             ControlHandler, SinkSocket, Socket, StreamSocket};
 use error::Error;
 
 pub struct Xpub {
@@ -52,10 +52,10 @@ impl AsSocket for Xpub {
 impl StreamSocket for Xpub {}
 impl SinkSocket for Xpub {}
 
-impl TryFrom<SockConfig> for Xpub {
+impl<'a> TryFrom<SockConfig<'a>> for Xpub {
     type Error = Error;
 
-    fn try_from(conf: SockConfig) -> Result<Self, Self::Error> {
+    fn try_from(conf: SockConfig<'a>) -> Result<Self, Self::Error> {
         Ok(Xpub { inner: conf.build(zmq::XPUB)? })
     }
 }
@@ -71,4 +71,10 @@ where
     fn socket(&self) -> &ControlledSocket {
         &self.inner
     }
+}
+
+impl<H> ControlledSinkSocket<H> for XpubControlled
+where
+    H: ControlHandler,
+{
 }

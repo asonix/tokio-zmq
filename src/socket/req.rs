@@ -41,10 +41,10 @@ impl AsSocket for Req {
 
 impl FutureSocket for Req {}
 
-impl TryFrom<SockConfig> for Req {
+impl<'a> TryFrom<SockConfig<'a>> for Req {
     type Error = Error;
 
-    fn try_from(conf: SockConfig) -> Result<Self, Self::Error> {
+    fn try_from(conf: SockConfig<'a>) -> Result<Self, Self::Error> {
         Ok(Req { inner: conf.build(zmq::REQ)? })
     }
 }

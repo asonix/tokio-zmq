@@ -1,10 +1,12 @@
 [package]
 name = "tokio-zmq"
 description = "Provides Futures abstractions for ZeroMQ on the Tokio event-loop"
-repository = "https://github.com/asonix/tokio-zmq"
 version = "0.1.0"
-authors = ["Riley Trautman <asonix.dev@gmail.com>"]
 license = "GPL-3.0"
+authors = ["Riley Trautman <asonix.dev@gmail.com>"]
+repository = "https://github.com/asonix/tokio-zmq"
+readme = "README.md"
+keywords = ["zmq", "zeromq", "futures", "tokio"]
 
 [dependencies]
 zmq = "0.8"

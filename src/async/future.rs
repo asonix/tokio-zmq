@@ -17,6 +17,9 @@
  * along with Tokio ZMQ.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+//! This module contains definitions for `MultipartRequest` and `MultipartResponse`, the two types that
+//! implement `futures::Future`.
+
 use std::collections::VecDeque;
 use std::rc::Rc;
 
@@ -26,11 +29,55 @@ use tokio_file_unix::File;
 use futures::{Async, Future, Poll};
 use futures::task;
 
-use async::sink::MsgPlace;
 use error::Error;
-use super::Multipart;
-use ZmqFile;
+use super::{MsgPlace, Multipart};
+use file::ZmqFile;
 
+/// The `MultipartRequest` Future handles asynchronously sending data to a socket.
+///
+/// You shouldn't ever need to manually create one, but if you do, the following will suffice.
+/// ### Example
+/// ```rust
+/// # #![feature(conservative_impl_trait)]
+/// # #![feature(try_from)]
+/// #
+/// # extern crate zmq;
+/// # extern crate futures;
+/// # extern crate tokio_core;
+/// # extern crate tokio_zmq;
+/// #
+/// # use std::rc::Rc;
+/// # use std::convert::TryInto;
+/// # use std::collections::VecDeque;
+/// #
+/// # use futures::Future;
+/// # use tokio_core::reactor::Core;
+/// # use tokio_zmq::prelude::*;
+/// # use tokio_zmq::async::MultipartRequest;
+/// # use tokio_zmq::{Error, Rep, Socket};
+/// #
+/// # fn main() {
+/// #     get_sock();
+/// # }
+/// # fn get_sock() -> impl Future<Item = (), Error = Error> {
+/// #     let core = Core::new().unwrap();
+/// #     let ctx = Rc::new(zmq::Context::new());
+/// #     let rep: Rep = Socket::new(ctx, core.handle())
+/// #         .bind("tcp://*:5567")
+/// #         .try_into()
+/// #         .unwrap();
+/// #     let socket = rep.socket();
+/// #     let sock = socket.inner_sock();
+/// #     let file = socket.inner_file();
+/// #     let mut multipart = VecDeque::new();
+/// #     let msg = zmq::Message::from_slice(format!("Hey").as_bytes()).unwrap();
+/// #     multipart.push_back(msg);
+/// MultipartRequest::new(sock, file, multipart).and_then(|_| {
+///     // succesfull request
+///     # Ok(())
+/// })
+/// # }
+/// ```
 pub struct MultipartRequest {
     sock: Rc<zmq::Socket>,
     file: Rc<PollEvented<File<ZmqFile>>>,
@@ -148,6 +195,48 @@ impl Future for MultipartRequest {
     }
 }
 
+/// The `MultipartResponse` Future handles asynchronously getting data from a socket.
+///
+/// You shouldn't ever need to manually create one, but if you do, the following will suffice.
+/// ### Example
+/// ```rust
+/// # #![feature(conservative_impl_trait)]
+/// # #![feature(try_from)]
+/// #
+/// # extern crate zmq;
+/// # extern crate futures;
+/// # extern crate tokio_core;
+/// # extern crate tokio_zmq;
+/// #
+/// # use std::rc::Rc;
+/// # use std::convert::TryInto;
+/// # use std::collections::VecDeque;
+/// #
+/// # use futures::Future;
+/// # use tokio_core::reactor::Core;
+/// # use tokio_zmq::prelude::*;
+/// # use tokio_zmq::async::{Multipart, MultipartResponse};
+/// # use tokio_zmq::{Error, Rep, Socket};
+/// #
+/// # fn main() {
+/// #     get_sock();
+/// # }
+/// # fn get_sock() -> impl Future<Item = Multipart, Error = Error> {
+/// #     let core = Core::new().unwrap();
+/// #     let ctx = Rc::new(zmq::Context::new());
+/// #     let rep: Rep = Socket::new(ctx, core.handle())
+/// #         .bind("tcp://*:5567")
+/// #         .try_into()
+/// #         .unwrap();
+/// #     let socket = rep.socket();
+/// #     let sock = socket.inner_sock();
+/// #     let file = socket.inner_file();
+/// MultipartResponse::new(sock, file).and_then(|multipart| {
+///     // handle multipart response
+///     # Ok(multipart)
+/// })
+/// # }
+/// ```
 pub struct MultipartResponse {
     sock: Rc<zmq::Socket>,
     file: Rc<PollEvented<File<ZmqFile>>>,

@@ -41,10 +41,10 @@ impl AsSocket for Pub {
 
 impl SinkSocket for Pub {}
 
-impl TryFrom<SockConfig> for Pub {
+impl<'a> TryFrom<SockConfig<'a>> for Pub {
     type Error = Error;
 
-    fn try_from(conf: SockConfig) -> Result<Self, Self::Error> {
+    fn try_from(conf: SockConfig<'a>) -> Result<Self, Self::Error> {
         Ok(Pub { inner: conf.build(zmq::PUB)? })
     }
 }

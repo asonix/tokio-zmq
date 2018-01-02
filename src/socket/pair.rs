@@ -21,9 +21,9 @@ use std::convert::TryFrom;
 
 use zmq;
 
-use socket::config::SockConfig;
-use socket::{AsSocket, ControlledSocket, ControlledStreamSocket, ControlHandler, SinkSocket,
-             Socket, StreamSocket};
+use socket::config::PairConfig;
+use socket::{AsSocket, ControlledSocket, ControlledSinkSocket, ControlledStreamSocket,
+             ControlHandler, SinkSocket, Socket, StreamSocket};
 use error::Error;
 
 pub struct Pair {
@@ -52,10 +52,10 @@ impl AsSocket for Pair {
 impl StreamSocket for Pair {}
 impl SinkSocket for Pair {}
 
-impl TryFrom<SockConfig> for Pair {
+impl<'a> TryFrom<PairConfig<'a>> for Pair {
     type Error = Error;
 
-    fn try_from(conf: SockConfig) -> Result<Self, Self::Error> {
+    fn try_from(conf: PairConfig<'a>) -> Result<Self, Self::Error> {
         Ok(Pair { inner: conf.build(zmq::PAIR)? })
     }
 }
@@ -71,4 +71,10 @@ where
     fn socket(&self) -> &ControlledSocket {
         &self.inner
     }
+}
+
+impl<H> ControlledSinkSocket<H> for PairControlled
+where
+    H: ControlHandler,
+{
 }

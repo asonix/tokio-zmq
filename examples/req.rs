@@ -33,7 +33,8 @@ use std::collections::VecDeque;
 use futures::{Future, Stream};
 use futures::stream::iter_ok;
 use tokio_core::reactor::Core;
-use tokio_zmq::{FutureSocket, Socket, Req};
+use tokio_zmq::prelude::*;
+use tokio_zmq::{Socket, Req};
 
 fn main() {
     env_logger::init().unwrap();
@@ -42,7 +43,7 @@ fn main() {
     let handle = core.handle();
     let ctx = Rc::new(zmq::Context::new());
     let req: Req = Socket::new(ctx, handle)
-        .connect("tcp://localhost:5560".into())
+        .connect("tcp://localhost:5560")
         .try_into()
         .unwrap();
 

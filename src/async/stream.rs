@@ -27,8 +27,47 @@ use futures::{Async, Future, Poll, Stream};
 use async::future::MultipartResponse;
 use error::Error;
 use super::Multipart;
-use ZmqFile;
+use file::ZmqFile;
 
+/// The `MultipartStream` Sink handles receiving streams of data from ZeroMQ Sockets.
+///
+/// You shouldn't ever need to manually create one. Here's how to get one from a 'raw' `Socket`'
+/// type.
+///
+/// ### Example
+/// ```rust
+/// #![feature(conservative_impl_trait)]
+///
+/// extern crate zmq;
+/// extern crate futures;
+/// extern crate tokio_core;
+/// extern crate tokio_zmq;
+///
+/// use std::rc::Rc;
+///
+/// use futures::Stream;
+/// use tokio_core::reactor::Core;
+/// use tokio_zmq::async::{Multipart, MultipartStream};
+/// use tokio_zmq::{Error, Socket};
+///
+/// fn get_stream(socket: Socket) -> impl Stream<Item = Multipart, Error = Error> {
+///     socket.stream().and_then(|multipart| {
+///         // handle multipart
+///         Ok(multipart)
+///     })
+/// }
+///
+/// fn main() {
+///     let core = Core::new().unwrap();
+///     let context = Rc::new(zmq::Context::new());
+///     let socket = Socket::new(context, core.handle())
+///         .connect("tcp://localhost:5568")
+///         .filter(b"")
+///         .build(zmq::SUB)
+///         .unwrap();
+///     get_stream(socket);
+/// }
+/// ```
 pub struct MultipartStream {
     response: Option<MultipartResponse>,
     // To read data
@@ -71,10 +110,22 @@ impl Stream for MultipartStream {
     }
 }
 
+/// The `ControlHandler` trait is used to impose stopping rules for streams that otherwise would
+/// continue to create multiparts.
 pub trait ControlHandler {
+    /// `should_stop` determines whether or not a `ControlledStream` should stop producing values.
+    ///
+    /// It accepts a Multipart as input. This Multipart comes from the ControlledStream's
+    /// associated control MultipartStream.
     fn should_stop(&self, multipart: Multipart) -> bool;
 }
 
+/// `ControlledStream`s are used when you want a stream of multiparts, but you want to be able to
+/// turn it off.
+///
+/// It contains a handler that implements the `ControlHandler` trait. This trait contains a single
+/// method `should_stop`, that determines whether or not the given stream should stop producing
+/// values.
 pub struct ControlledStream<H>
 where
     H: ControlHandler,
@@ -88,6 +139,10 @@ impl<H> ControlledStream<H>
 where
     H: ControlHandler,
 {
+    /// Create a new ControlledStream.
+    ///
+    /// This shouldn't be called directly. A socket wrapper type's `controlled` method, if present,
+    /// will perform the required actions to create and encapsulate this type.
     pub fn new(
         sock: Rc<zmq::Socket>,
         file: Rc<PollEvented<File<ZmqFile>>>,
@@ -110,10 +165,15 @@ where
     type Item = Multipart;
     type Error = Error;
 
+    /// Poll the control stream, if it isn't ready, poll the producing stream
+    ///
+    /// If the control stream is ready, but has ended, stop the producting stream.
+    /// If the control stream is ready with a Multipart, use the `ControlHandler` to
+    /// determine if the producting stream should be stopped.
     fn poll(&mut self) -> Poll<Option<Multipart>, Error> {
         let stop = match self.control.poll()? {
             Async::NotReady => false,
-            Async::Ready(None) => false,
+            Async::Ready(None) => true,
             Async::Ready(Some(multipart)) => self.handler.should_stop(multipart),
         };
 
