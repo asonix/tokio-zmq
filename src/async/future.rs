@@ -26,7 +26,7 @@ use std::rc::Rc;
 use zmq;
 use tokio_core::reactor::PollEvented;
 use tokio_file_unix::File;
-use futures::{Async, Future, Poll};
+use futures::{Async, AsyncSink, Future, Poll};
 use futures::task;
 
 use error::Error;
@@ -127,7 +127,7 @@ impl MultipartRequest {
             };
 
             match self.send_msg(msg, place)? {
-                Async::Ready(()) => {
+                AsyncSink::Ready => {
                     debug!("MultipartRequest: Sent!");
 
                     if multipart.is_empty() {
@@ -135,8 +135,8 @@ impl MultipartRequest {
                         break;
                     }
                 }
-                Async::NotReady => {
-                    // In the future, push_front the failed message
+                AsyncSink::NotReady(msg) => {
+                    multipart.push_front(msg);
                 }
             }
 
@@ -146,7 +146,11 @@ impl MultipartRequest {
         Ok(Async::Ready(()))
     }
 
-    fn send_msg(&mut self, msg: zmq::Message, place: MsgPlace) -> Poll<(), Error> {
+    fn send_msg(
+        &mut self,
+        msg: zmq::Message,
+        place: MsgPlace,
+    ) -> Result<AsyncSink<zmq::Message>, Error> {
         debug!("MultipartRequest: send_msg");
         let events = self.sock.get_events()? as i16;
 
@@ -154,7 +158,7 @@ impl MultipartRequest {
             debug!("MultipartRequest: need_write()");
             self.file.need_write();
 
-            return Ok(Async::NotReady);
+            return Ok(AsyncSink::NotReady(msg));
         }
 
         let flags = zmq::DONTWAIT |
@@ -165,8 +169,9 @@ impl MultipartRequest {
             };
 
         match self.sock.send_msg(msg, flags) {
-            Ok(_) => Ok(Async::Ready(())),
+            Ok(_) => Ok(AsyncSink::Ready),
             Err(e @ zmq::Error::EAGAIN) => {
+                // return message in future
                 debug!("MultipartRequest: EAGAIN");
                 Err(e.into())
             }
