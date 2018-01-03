@@ -194,13 +194,9 @@ fn broker() {
         })
         .forward(dealer.sink::<Error>());
 
-    core.handle().spawn(
-        d2r.map(|_| println!("d2r bailed")).map_err(
-            |e| {
-                println!("d2r bailed: {:?}", e)
-            },
-        ),
-    );
+    core.handle().spawn(d2r.map(|_| ()).map_err(|e| {
+        println!("d2r bailed: {:?}", e)
+    }));
     let res = core.run(r2d);
 
     if let Err(e) = res {
