@@ -15,6 +15,8 @@ Currently Supported Sockets
  - XPUB
  - XSUB
  - PAIR
+ - DEALER
+ - ROUTER
 
 See the [examples folder](https://github.com/asonix/zmq-futures/tree/master/examples) for usage examples.
 
@@ -23,7 +25,7 @@ See the [examples folder](https://github.com/asonix/zmq-futures/tree/master/exam
 Add the following to your Cargo.toml
 ```toml
 zmq = "0.8"
-tokio-zmq = "0.1.0"
+tokio-zmq = "0.1.1"
 futures = "0.1"
 tokio-core = "0.1"
 ```
@@ -47,7 +49,7 @@ fn main() {
         .bind("tcp://*:5560")
         .try_into()
         .unwrap()
-  
+
     let runner = rep.stream()
         .and_then(|multipart| {
             // handle the multipart (VecDeque<zmq::Message>)
@@ -55,7 +57,7 @@ fn main() {
             Ok(multipart)
         })
         .forward(rep.sink::<Error>());
-  
+
     core.run(runner).unwrap();
 }
 ```
