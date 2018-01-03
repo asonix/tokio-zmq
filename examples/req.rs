@@ -47,7 +47,7 @@ fn main() {
         .try_into()
         .unwrap();
 
-    let runner = iter_ok(0..10)
+    let runner = iter_ok(0..10000)
         .and_then(|i| {
             let mut multipart = VecDeque::new();
             let msg1 = zmq::Message::from_slice(format!("Hewwo? {}", i).as_bytes()).unwrap();
