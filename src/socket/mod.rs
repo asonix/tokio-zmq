@@ -19,36 +19,27 @@
 
 //! This module contains useful traits and types for working with ZeroMQ Sockets.
 
+mod config;
+mod types;
+
+pub use self::types::{Dealer, DealerControlled};
+pub use self::types::{Pair, PairControlled};
+pub use self::types::{Pull, PullControlled};
+pub use self::types::{Rep, RepControlled};
+pub use self::types::{Router, RouterControlled};
+pub use self::types::{Sub, SubControlled};
+pub use self::types::{Xpub, XpubControlled};
+pub use self::types::{Xsub, XsubControlled};
+pub use self::types::Pub;
+pub use self::types::Push;
+pub use self::types::Req;
+pub use self::config::SockConfig;
+
 use std::rc::Rc;
 
 use zmq;
 use tokio_core::reactor::{Handle, PollEvented};
 use tokio_file_unix::File;
-
-mod config;
-mod rep;
-mod req;
-mod zpub;
-mod sub;
-mod push;
-mod pull;
-mod xpub;
-mod xsub;
-mod pair;
-mod dealer;
-mod router;
-
-pub use self::rep::{Rep, RepControlled};
-pub use self::req::Req;
-pub use self::zpub::Pub;
-pub use self::sub::{Sub, SubControlled};
-pub use self::push::Push;
-pub use self::pull::{Pull, PullControlled};
-pub use self::xpub::{Xpub, XpubControlled};
-pub use self::xsub::{Xsub, XsubControlled};
-pub use self::pair::{Pair, PairControlled};
-pub use self::dealer::{Dealer, DealerControlled};
-pub use self::router::{Router, RouterControlled};
 
 use self::config::SockConfigStart;
 use async::{ControlledStream, ControlHandler, Multipart, MultipartRequest, MultipartResponse,
