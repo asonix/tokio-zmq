@@ -26,7 +26,7 @@ use std::rc::Rc;
 use zmq;
 use tokio_core::reactor::PollEvented;
 use tokio_file_unix::File;
-use futures::{Async, Future, Poll};
+use futures::{Async, AsyncSink, Future, Poll};
 use futures::task;
 
 use error::Error;
@@ -99,52 +99,66 @@ impl MultipartRequest {
 
     fn send(&mut self) -> Poll<(), Error> {
         loop {
+            debug!("MultipartRequest: loop");
             let mut multipart = match self.multipart.take() {
                 Some(multipart) => multipart,
-                None => return Ok(Async::Ready(())),
+                None => {
+                    debug!("MultipartRequest: breaking loop, no multipart");
+                    break;
+                }
             };
 
             let msg = match multipart.pop_front() {
                 Some(msg) => msg,
                 None => {
                     self.multipart = None;
-                    return Ok(Async::Ready(()));
+                    debug!("MultipartRequest: breaking loop, empty multipart");
+                    task::current().notify();
+                    break;
                 }
             };
 
             let place = if multipart.is_empty() {
+                debug!("MultipartRequest: Last message");
                 MsgPlace::Last
             } else {
+                debug!("MultipartRequest: Nth message");
                 MsgPlace::Nth
             };
 
             match self.send_msg(msg, place)? {
-                Async::Ready(()) => (),
-                Async::NotReady => {
-                    // In the future, push_front the failed message
-                    ()
-                }
-            }
+                AsyncSink::Ready => {
+                    debug!("MultipartRequest: Sent!");
 
-            if multipart.is_empty() {
-                return Ok(Async::Ready(()));
+                    if multipart.is_empty() {
+                        debug!("MultipartRequest: breaking loop");
+                        break;
+                    }
+                }
+                AsyncSink::NotReady(msg) => {
+                    multipart.push_front(msg);
+                }
             }
 
             self.multipart = Some(multipart);
         }
+
+        Ok(Async::Ready(()))
     }
 
-    fn send_msg(&mut self, msg: zmq::Message, place: MsgPlace) -> Poll<(), Error> {
+    fn send_msg(
+        &mut self,
+        msg: zmq::Message,
+        place: MsgPlace,
+    ) -> Result<AsyncSink<zmq::Message>, Error> {
+        debug!("MultipartRequest: send_msg");
         let events = self.sock.get_events()? as i16;
 
         if events & zmq::POLLOUT == 0 {
-            if events & zmq::POLLIN != 0 {
-                self.file.need_read();
-            } else {
-                self.file.need_write();
-            }
+            debug!("MultipartRequest: need_write()");
+            self.file.need_write();
 
-            return Ok(Async::NotReady);
+            return Ok(AsyncSink::NotReady(msg));
         }
 
         let flags = zmq::DONTWAIT |
@@ -155,8 +169,12 @@ impl MultipartRequest {
             };
 
         match self.sock.send_msg(msg, flags) {
-            Ok(_) => Ok(Async::Ready(())),
-            Err(e @ zmq::Error::EAGAIN) => Err(e.into()),
+            Ok(_) => Ok(AsyncSink::Ready),
+            Err(e @ zmq::Error::EAGAIN) => {
+                // return message in future
+                debug!("MultipartRequest: EAGAIN");
+                Err(e.into())
+            }
             Err(e) => Err(e.into()),
         }
     }
@@ -167,13 +185,14 @@ impl MultipartRequest {
             let events = self.sock.get_events()? as i16;
             if events & zmq::POLLOUT != 0 {
                 // manually schedule a wakeup and procede
-                debug!("Write ready, but file doesn't think so");
+                debug!("MultipartRequest: Write ready, but file doesn't think so");
                 task::current().notify();
             } else {
                 return Ok(false);
             }
 
             if events & zmq::POLLIN != 0 {
+                debug!("MultipartRequest: need_read()");
                 self.file.need_read();
             }
         }
@@ -187,6 +206,7 @@ impl Future for MultipartRequest {
     type Error = Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        debug!("MultipartRequest: in poll");
         if self.check_write()? {
             self.send()
         } else {
@@ -253,44 +273,61 @@ impl MultipartResponse {
     }
 
     fn recv(&mut self) -> Poll<Multipart, Error> {
+        debug!("MultipartResponse: recv");
         let events = self.sock.get_events()? as i16;
 
         if events & zmq::POLLIN == 0 {
-            if events & zmq::POLLOUT != 0 {
-                self.file.need_write();
-            } else {
-                self.file.need_read();
-            }
+            debug!("MultipartResponse: need_read()");
+            self.file.need_read();
 
+            debug!("MultipartResponse: leaving recv");
             return Ok(Async::NotReady);
         }
 
-        match self.recv_msg()? {
-            Async::Ready(msg) => {
-                let mut multipart = self.multipart.take().unwrap_or(VecDeque::new());
+        let mut first = true;
 
-                let more = msg.get_more();
+        loop {
+            debug!("MultipartResponse: loop");
+            match self.recv_msg()? {
+                Async::Ready(msg) => {
+                    first = false;
+                    let mut multipart = self.multipart.take().unwrap_or(VecDeque::new());
 
-                multipart.push_back(msg);
+                    let more = msg.get_more();
 
-                if !more {
-                    return Ok(Async::Ready(multipart));
+                    multipart.push_back(msg);
+
+                    if !more {
+                        debug!("MultipartResponse: Done receiving, returning multipart");
+                        return Ok(Async::Ready(multipart));
+                    }
+
+                    debug!("MultipartResponse: Waiting on more");
+                    self.multipart = Some(multipart);
                 }
-
-                task::current().notify();
-                self.multipart = Some(multipart);
-                Ok(Async::NotReady)
+                Async::NotReady => {
+                    if first {
+                        debug!("MultipartResponse: leaving recv, not ready");
+                        return Ok(Async::NotReady);
+                    }
+                }
             }
-            Async::NotReady => Ok(Async::NotReady),
         }
     }
 
     fn recv_msg(&mut self) -> Poll<zmq::Message, Error> {
+        debug!("MultipartResponse: recv_msg");
         let mut msg = zmq::Message::new()?;
 
         match self.sock.recv(&mut msg, zmq::DONTWAIT) {
-            Ok(_) => Ok(Async::Ready(msg)),
-            Err(zmq::Error::EAGAIN) => Ok(Async::NotReady),
+            Ok(_) => {
+                debug!("MultipartResponse: received: {:?}", msg.as_str());
+                Ok(Async::Ready(msg))
+            }
+            Err(zmq::Error::EAGAIN) => {
+                debug!("MultipartResponse: EAGAIN");
+                Ok(Async::NotReady)
+            }
             Err(e) => Err(e.into()),
         }
     }
@@ -300,7 +337,7 @@ impl MultipartResponse {
             let events = self.sock.get_events()? as i16;
             if events & zmq::POLLIN != 0 {
                 // manually schedule a wakeup and procede
-                debug!("Read ready, but file doesn't think so");
+                debug!("MultipartResponse: Read ready, but file doesn't think so");
                 task::current().notify();
             } else {
                 return Ok(false);
@@ -320,6 +357,7 @@ impl Future for MultipartResponse {
     type Error = Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        debug!("MultipartResponse: In poll");
         if self.check_read()? {
             self.recv()
         } else {
