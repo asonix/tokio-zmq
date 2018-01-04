@@ -113,4 +113,4 @@ pub mod prelude;
 
 pub use self::error::Error;
 pub use self::socket::Socket;
-pub use self::socket::{Dealer, Rep, Req, Router, Pub, Sub, Push, Pull, Xpub, Xsub, Pair};
+pub use self::socket::types::{Dealer, Rep, Req, Router, Pub, Sub, Push, Pull, Xpub, Xsub, Pair};

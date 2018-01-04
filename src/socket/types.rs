@@ -17,6 +17,8 @@
  * along with Tokio ZMQ.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+//! This module defines all the socket wrapper types that can be used with Tokio.
+
 use std::convert::TryFrom;
 
 use zmq;
