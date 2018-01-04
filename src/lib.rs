@@ -105,12 +105,12 @@ extern crate tokio_file_unix;
 #[macro_use]
 extern crate log;
 
+mod error;
 pub mod async;
-pub mod error;
 pub mod socket;
 pub mod file;
 pub mod prelude;
 
 pub use self::error::Error;
-pub use socket::Socket;
-pub use socket::{Dealer, Rep, Req, Router, Pub, Sub, Push, Pull, Xpub, Xsub, Pair};
+pub use self::socket::Socket;
+pub use self::socket::{Dealer, Rep, Req, Router, Pub, Sub, Push, Pull, Xpub, Xsub, Pair};

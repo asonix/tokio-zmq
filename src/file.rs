@@ -17,6 +17,9 @@
  * along with Tokio ZMQ.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+//! This module contains definitions for the ZmqFile type, a small wrapper around a RawFd so
+//! tokio_file_unix can interact with it.
+
 use std::os::unix::io::{AsRawFd, RawFd};
 
 /// Create a simple wraper struct to hand to tokio_file_unix's File new_nb constructor
