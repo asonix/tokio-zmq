@@ -111,7 +111,6 @@ pub mod socket;
 pub mod file;
 pub mod prelude;
 
-pub use async::ControlHandler;
 pub use self::error::Error;
 pub use socket::Socket;
 pub use socket::{Dealer, Rep, Req, Router, Pub, Sub, Push, Pull, Xpub, Xsub, Pair};

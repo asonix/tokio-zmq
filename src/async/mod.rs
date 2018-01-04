@@ -32,7 +32,7 @@ use zmq;
 
 pub use self::future::{MultipartRequest, MultipartResponse};
 pub use self::sink::MultipartSink;
-pub use self::stream::{ControlledStream, ControlHandler, MultipartStream};
+pub use self::stream::{ControlledStream, MultipartStream};
 
 /// This type is used for receiving and sending messages in Multipart groups. An application could
 /// make using this easier by implementing traits as follows:

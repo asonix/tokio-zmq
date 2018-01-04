@@ -24,6 +24,7 @@ use tokio_core::reactor::PollEvented;
 use tokio_file_unix::File;
 use futures::{Async, Future, Poll, Stream};
 
+use prelude::{ControlHandler, DefaultEndHandler, EndHandler};
 use async::future::MultipartResponse;
 use error::Error;
 use super::Multipart;
@@ -68,26 +69,59 @@ use file::ZmqFile;
 ///     get_stream(socket);
 /// }
 /// ```
-pub struct MultipartStream {
+pub struct MultipartStream<E>
+where
+    E: EndHandler,
+{
+    // To build a multipart
     response: Option<MultipartResponse>,
     // To read data
     sock: Rc<zmq::Socket>,
     // Handles notifications to/from the event loop
     file: Rc<PollEvented<File<ZmqFile>>>,
+    // To handle stopping
+    end_handler: Option<E>,
 }
 
-impl MultipartStream {
+impl MultipartStream<DefaultEndHandler> {
     pub fn new(sock: Rc<zmq::Socket>, file: Rc<PollEvented<File<ZmqFile>>>) -> Self {
         MultipartStream {
             response: None,
             sock: sock,
             file: file,
+            end_handler: None,
+        }
+    }
+}
+
+impl<E> MultipartStream<E>
+where
+    E: EndHandler,
+{
+    pub fn new_with_end(
+        sock: Rc<zmq::Socket>,
+        file: Rc<PollEvented<File<ZmqFile>>>,
+        end_handler: E,
+    ) -> Self {
+        MultipartStream {
+            response: None,
+            sock: sock,
+            file: file,
+            end_handler: Some(end_handler),
         }
     }
 
     fn poll_response(&mut self, mut response: MultipartResponse) -> Poll<Option<Multipart>, Error> {
         match response.poll()? {
-            Async::Ready(item) => Ok(Async::Ready(Some(item))),
+            Async::Ready(item) => {
+                if let Some(ref mut end_handler) = self.end_handler {
+                    if end_handler.should_stop(&item) {
+                        return Ok(Async::Ready(None));
+                    }
+                }
+
+                Ok(Async::Ready(Some(item)))
+            }
             Async::NotReady => {
                 self.response = Some(response);
                 Ok(Async::NotReady)
@@ -96,7 +130,10 @@ impl MultipartStream {
     }
 }
 
-impl Stream for MultipartStream {
+impl<E> Stream for MultipartStream<E>
+where
+    E: EndHandler,
+{
     type Item = Multipart;
     type Error = Error;
 
@@ -111,32 +148,23 @@ impl Stream for MultipartStream {
     }
 }
 
-/// The `ControlHandler` trait is used to impose stopping rules for streams that otherwise would
-/// continue to create multiparts.
-pub trait ControlHandler {
-    /// `should_stop` determines whether or not a `ControlledStream` should stop producing values.
-    ///
-    /// It accepts a Multipart as input. This Multipart comes from the ControlledStream's
-    /// associated control MultipartStream.
-    fn should_stop(&self, multipart: Multipart) -> bool;
-}
-
 /// `ControlledStream`s are used when you want a stream of multiparts, but you want to be able to
 /// turn it off.
 ///
 /// It contains a handler that implements the `ControlHandler` trait. This trait contains a single
 /// method `should_stop`, that determines whether or not the given stream should stop producing
 /// values.
-pub struct ControlledStream<H>
+pub struct ControlledStream<E, H>
 where
+    E: EndHandler,
     H: ControlHandler,
 {
-    stream: MultipartStream,
-    control: MultipartStream,
+    stream: MultipartStream<E>,
+    control: MultipartStream<DefaultEndHandler>,
     handler: H,
 }
 
-impl<H> ControlledStream<H>
+impl<H> ControlledStream<DefaultEndHandler, H>
 where
     H: ControlHandler,
 {
@@ -150,7 +178,7 @@ where
         control_sock: Rc<zmq::Socket>,
         control_file: Rc<PollEvented<File<ZmqFile>>>,
         handler: H,
-    ) -> Self {
+    ) -> ControlledStream<DefaultEndHandler, H> {
         ControlledStream {
             stream: MultipartStream::new(sock, file),
             control: MultipartStream::new(control_sock, control_file),
@@ -159,8 +187,34 @@ where
     }
 }
 
-impl<H> Stream for ControlledStream<H>
+impl<E, H> ControlledStream<E, H>
 where
+    E: EndHandler,
+    H: ControlHandler,
+{
+    /// Create a new ControlledStream with an EndHandler as well
+    ///
+    /// This shouldn't be called directly. A socket wrapper type's `controlled_with_end` method, if
+    /// present, will performt he required actions to create and encpasulate this type.
+    pub fn new_with_end(
+        sock: Rc<zmq::Socket>,
+        file: Rc<PollEvented<File<ZmqFile>>>,
+        control_sock: Rc<zmq::Socket>,
+        control_file: Rc<PollEvented<File<ZmqFile>>>,
+        handler: H,
+        end_handler: E,
+    ) -> Self {
+        ControlledStream {
+            stream: MultipartStream::new_with_end(sock, file, end_handler),
+            control: MultipartStream::new(control_sock, control_file),
+            handler: handler,
+        }
+    }
+}
+
+impl<E, H> Stream for ControlledStream<E, H>
+where
+    E: EndHandler,
     H: ControlHandler,
 {
     type Item = Multipart;

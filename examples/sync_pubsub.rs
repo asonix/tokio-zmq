@@ -39,14 +39,26 @@ use tokio_zmq::prelude::*;
 use tokio_zmq::{Rep, Req, Pub, Sub};
 use tokio_zmq::{Socket, Error};
 
+// On my quad-core i7, if I run with too many threads, the context switching takes too long and
+// some messages get dropped. 2 subscribers can properly retrieve 1 million messages each, though.
+//
+// For the nice results, lower the messages and increas the subscribers.
 const SUBSCRIBERS: usize = 10;
+const MESSAGES: usize = 1_000;
 
 struct Stop;
 
-impl ControlHandler for Stop {
-    fn should_stop(&self, _: VecDeque<zmq::Message>) -> bool {
-        println!("Got stop signal");
-        true
+impl EndHandler for Stop {
+    fn should_stop(&mut self, item: &VecDeque<zmq::Message>) -> bool {
+        if let Some(ref msg) = item.get(0) {
+            if let Some(msg) = msg.as_str() {
+                if msg == "END" {
+                    return true;
+                }
+            }
+        }
+
+        false
     }
 }
 
@@ -78,7 +90,7 @@ fn publisher_thread() {
         .and_then(|_| {
             println!("Broadcasting message");
 
-            iter_ok(0..1_000)
+            iter_ok(0..MESSAGES)
                 .map(|_| {
                     let msg = zmq::Message::from_slice(b"Rhubarb").unwrap();
 
@@ -100,30 +112,15 @@ fn publisher_thread() {
     core.run(runner).unwrap();
 }
 
-fn subscriber_thread(thread_num: usize) {
+fn subscriber_thread() {
     let mut core = Core::new().unwrap();
     let ctx = Rc::new(zmq::Context::new());
-
-    let port = 5563 + thread_num;
-
-    let pcontroller: Pub = Socket::new(Rc::clone(&ctx), core.handle())
-        .bind(&format!("tcp://*:{}", port))
-        .try_into()
-        .unwrap();
-
-    let scontroller: Sub = Socket::new(Rc::clone(&ctx), core.handle())
-        .connect(&format!("tcp://localhost:{}", port))
-        .filter(b"")
-        .try_into()
-        .unwrap();
 
     let subscriber: Sub = Socket::new(Rc::clone(&ctx), core.handle())
         .connect("tcp://localhost:5561")
         .filter(b"")
         .try_into()
         .unwrap();
-
-    let subscriber = subscriber.controlled(scontroller);
 
     let syncclient: Req = Socket::new(ctx, core.handle())
         .connect("tcp://localhost:5562")
@@ -136,36 +133,18 @@ fn subscriber_thread(thread_num: usize) {
 
     let recv = syncclient.recv();
 
-    let handle = core.handle();
-
-    let runner =
-        syncclient
-            .send(multipart)
-            .and_then(move |_| recv)
-            .and_then(|_| {
-                subscriber
-                    .stream(Stop)
-                    .fold(0, |counter, mut item| {
-                        if let Some(msg) = item.pop_front() {
-                            if let Some(msg) = msg.as_str() {
-                                if msg == "END" {
-                                    let msg = zmq::Message::from_slice(b"").unwrap();
-                                    let mut multipart = VecDeque::new();
-                                    multipart.push_back(msg);
-                                    handle.spawn(
-                                        pcontroller.send(multipart).map(|_| ()).map_err(|_| ()),
-                                    );
-                                }
-                            }
-                        }
-
-                        Ok(counter + 1) as Result<usize, Error>
-                    })
-                    .and_then(|total| {
-                        println!("Received {} updates", total);
-                        Ok(())
-                    })
-            });
+    let runner = syncclient
+        .send(multipart)
+        .and_then(move |_| recv)
+        .and_then(|_| {
+            subscriber
+                .stream_with_end(Stop)
+                .fold(0, |counter, _| Ok(counter + 1) as Result<usize, Error>)
+                .and_then(|total| {
+                    println!("Received {} updates", total);
+                    Ok(())
+                })
+        });
 
     core.run(runner).unwrap();
 }
@@ -174,9 +153,9 @@ fn main() {
     let mut threads = Vec::new();
     threads.push(thread::spawn(publisher_thread));
 
-    for i in 0..SUBSCRIBERS {
-        thread::sleep(Duration::from_secs(1));
-        threads.push(thread::spawn(move || subscriber_thread(i)));
+    for _ in 0..SUBSCRIBERS {
+        thread::sleep(Duration::from_millis(400));
+        threads.push(thread::spawn(subscriber_thread));
     }
 
     for thread in threads {

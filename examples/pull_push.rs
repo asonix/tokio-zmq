@@ -37,7 +37,7 @@ use tokio_zmq::{Error as ZmqFutError, Socket};
 pub struct Stop;
 
 impl ControlHandler for Stop {
-    fn should_stop(&self, _: VecDeque<zmq::Message>) -> bool {
+    fn should_stop(&mut self, _: VecDeque<zmq::Message>) -> bool {
         println!("Got stop signal");
         true
     }
