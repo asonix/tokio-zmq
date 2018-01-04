@@ -385,6 +385,7 @@ pub trait FutureSocket: AsSocket {
 
 /// Defines the raw Socket type. This type should never be interacted with directly, except to
 /// create new instances of wrapper types.
+#[derive(Clone)]
 pub struct Socket {
     // Reads and Writes data
     sock: Rc<zmq::Socket>,
@@ -458,6 +459,7 @@ impl Socket {
 ///
 /// Controlled sockets are useful for being able to stop streams. They shouldn't be created
 /// directly, but through a wrapper type's `controlled` method.
+#[derive(Clone)]
 pub struct ControlledSocket {
     stream_sock: Socket,
     control_sock: Socket,

@@ -31,6 +31,7 @@ use error::Error;
 /// The DEALER SocketType wrapper type.
 ///
 /// Dealer implements StreamSocket and SinkSocket, and has an associated controlled variant.
+#[derive(Clone)]
 pub struct Dealer {
     inner: Socket,
 }
@@ -67,6 +68,7 @@ impl<'a> TryFrom<SockConfig<'a>> for Dealer {
 }
 
 /// The controlled variant of Dealer
+#[derive(Clone)]
 pub struct DealerControlled {
     inner: ControlledSocket,
 }
@@ -90,6 +92,7 @@ impl ControlledSinkSocket for DealerControlled {}
 /// The PAIR SocketType wrapper type.
 ///
 /// Pair implements StreamSocket and SinkSocket, and has an associated controlled variant.
+#[derive(Clone)]
 pub struct Pair {
     inner: Socket,
 }
@@ -126,6 +129,7 @@ impl<'a> TryFrom<PairConfig<'a>> for Pair {
 }
 
 /// The controlled variant of Pair
+#[derive(Clone)]
 pub struct PairControlled {
     inner: ControlledSocket,
 }
@@ -149,6 +153,7 @@ impl ControlledSinkSocket for PairControlled {}
 /// The PUB SocketType wrapper type
 ///
 /// Pub implements SinkSocket.
+#[derive(Clone)]
 pub struct Pub {
     inner: Socket,
 }
@@ -178,6 +183,7 @@ impl<'a> TryFrom<SockConfig<'a>> for Pub {
 /// The PULL SocketType wrapper type
 ///
 /// Pull implements StreamSocket, and has an associated controlled variant.
+#[derive(Clone)]
 pub struct Pull {
     inner: Socket,
 }
@@ -213,6 +219,7 @@ impl<'a> TryFrom<SockConfig<'a>> for Pull {
 }
 
 /// The controlled variant of Pull
+#[derive(Clone)]
 pub struct PullControlled {
     inner: ControlledSocket,
 }
@@ -234,6 +241,7 @@ where
 /// The PUSH SocketType wrapper type
 ///
 /// Push implements SinkSocket.
+#[derive(Clone)]
 pub struct Push {
     inner: Socket,
 }
@@ -263,6 +271,7 @@ impl<'a> TryFrom<SockConfig<'a>> for Push {
 /// The REP SocketType wrapper type
 ///
 /// Rep implements StreamSocket and SinkSocket, and has an associated controlled variant.
+#[derive(Clone)]
 pub struct Rep {
     inner: Socket,
 }
@@ -299,6 +308,7 @@ impl<'a> TryFrom<SockConfig<'a>> for Rep {
 }
 
 /// The controlled variant of Rep
+#[derive(Clone)]
 pub struct RepControlled {
     inner: ControlledSocket,
 }
@@ -322,6 +332,7 @@ impl ControlledSinkSocket for RepControlled {}
 /// The REQ SocketType wrapper type
 ///
 /// Req implements FutureSocket.
+#[derive(Clone)]
 pub struct Req {
     inner: Socket,
 }
@@ -351,6 +362,7 @@ impl<'a> TryFrom<SockConfig<'a>> for Req {
 /// The ROUTER SocketType wrapper type
 ///
 /// Router implements StreamSocket and SinkSocket, and has an associated controlled variant.
+#[derive(Clone)]
 pub struct Router {
     inner: Socket,
 }
@@ -387,6 +399,7 @@ impl<'a> TryFrom<SockConfig<'a>> for Router {
 }
 
 /// The controlled variant of Router
+#[derive(Clone)]
 pub struct RouterControlled {
     inner: ControlledSocket,
 }
@@ -410,6 +423,7 @@ impl ControlledSinkSocket for RouterControlled {}
 /// The SUB SocketType wrapper type
 ///
 /// Sub implements StreamSocket, and has an associated controlled variant.
+#[derive(Clone)]
 pub struct Sub {
     inner: Socket,
 }
@@ -445,6 +459,7 @@ impl<'a> TryFrom<SubConfig<'a>> for Sub {
 }
 
 /// The controlled variant of Sub.
+#[derive(Clone)]
 pub struct SubControlled {
     inner: ControlledSocket,
 }
@@ -466,6 +481,7 @@ where
 /// The XPUB SocketType wrapper type
 ///
 /// Xpub implements StreamSocket and SinkSocket, and has an associated controlled variant.
+#[derive(Clone)]
 pub struct Xpub {
     inner: Socket,
 }
@@ -502,6 +518,7 @@ impl<'a> TryFrom<SockConfig<'a>> for Xpub {
 }
 
 /// The controlled variant of Xpub
+#[derive(Clone)]
 pub struct XpubControlled {
     inner: ControlledSocket,
 }
@@ -525,6 +542,7 @@ impl ControlledSinkSocket for XpubControlled {}
 /// The XSUB SocketType wrapper type
 ///
 /// Xsub implements StreamSocket and SinkSocket, and has an associated controlled variant.
+#[derive(Clone)]
 pub struct Xsub {
     inner: Socket,
 }
@@ -561,6 +579,7 @@ impl<'a> TryFrom<SockConfig<'a>> for Xsub {
 }
 
 /// The controlled variant of Xsub
+#[derive(Clone)]
 pub struct XsubControlled {
     inner: ControlledSocket,
 }

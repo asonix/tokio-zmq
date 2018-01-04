@@ -31,7 +31,7 @@ use std::collections::VecDeque;
 use futures::{Future, Stream};
 use tokio_core::reactor::Core;
 use tokio_zmq::prelude::*;
-use tokio_zmq::{Pub, Pull, PullControlled, Sub};
+use tokio_zmq::{Pub, Pull, Sub};
 use tokio_zmq::Socket;
 
 pub struct Stop;
@@ -56,7 +56,7 @@ fn main() {
         .bind("tcp://*:5558")
         .try_into()
         .unwrap();
-    let conn: PullControlled = conn.controlled(cmd);
+    let conn = conn.controlled(cmd);
     let send_cmd: Pub = Socket::new(ctx, handle.clone())
         .bind("tcp://*:5559")
         .try_into()
