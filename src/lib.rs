@@ -104,6 +104,8 @@ extern crate tokio_core;
 extern crate tokio_file_unix;
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate tokio_zmq_derive;
 
 mod error;
 pub mod async;

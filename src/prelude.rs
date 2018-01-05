@@ -56,24 +56,25 @@ pub trait AsControlledSocket {
 
 /// This trait is used for types wrapping `ControlledSocket`s. It depends on the type implementing
 /// AsControlledSocket, which is analogous to the `AsSocket` trait's `socket(&self)` method.
-pub trait ControlledStreamSocket<H>: AsControlledSocket
-where
-    H: ControlHandler,
-{
+pub trait ControlledStreamSocket: AsControlledSocket {
     /// Receive a single multipart message from the socket.
     fn recv(&self) -> MultipartResponse {
         self.socket().recv()
     }
 
     /// Receive a stream of multipart messages from the socket.
-    fn stream(&self, handler: H) -> ControlledStream<DefaultEndHandler, H> {
+    fn stream<H>(&self, handler: H) -> ControlledStream<DefaultEndHandler, H>
+    where
+        H: ControlHandler,
+    {
         self.socket().stream(handler)
     }
 
     /// Receive a stream of multipart messages from the socket, ending when handler or
     /// end_handler's should_stop return true.
-    fn stream_with_end<E>(&self, handler: H, end_handler: E) -> ControlledStream<E, H>
+    fn stream_with_end<E, H>(&self, handler: H, end_handler: E) -> ControlledStream<E, H>
     where
+        H: ControlHandler,
         E: EndHandler,
     {
         self.socket().stream_with_end(handler, end_handler)
@@ -122,6 +123,17 @@ pub trait EndHandler {
     /// the rest of the messages that socket receives. If you want to have a socket controlled by
     /// another socket, see the `ControlHandler` trait.
     fn should_stop(&mut self, multipart: &Multipart) -> bool;
+}
+
+/// The `IntoControlledSocket` trait is used on Streams to allow the stream to be controlled by
+/// messages from another socket.
+pub trait IntoControlledSocket: StreamSocket {
+    type Controlled: AsControlledSocket;
+
+    /// Construct a controlled version of the given socket.
+    fn controlled<S>(self, control: S) -> Self::Controlled
+    where
+        S: StreamSocket;
 }
 
 /// This trait provides the basic Stream support for ZeroMQ Sockets. It depends on AsSocket, but
