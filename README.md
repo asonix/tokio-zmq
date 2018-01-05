@@ -25,7 +25,7 @@ See the [examples folder](https://github.com/asonix/zmq-futures/tree/master/exam
 Add the following to your Cargo.toml
 ```toml
 zmq = "0.8"
-tokio-zmq = "0.1.1"
+tokio-zmq = "0.1.2"
 futures = "0.1"
 tokio-core = "0.1"
 ```
@@ -68,6 +68,8 @@ The `req.rs` and `rep.rs` examples are designed to be used together. The `rep` e
 The `zpub.rs` and `sub.rs` examples should be used togheter. `zpub` produces values that `sub` consumes.
 
 The `push.rs`, `pull_push.rs`, and `pull.rs` files should be used together. `push` produces values, which are relayed by `pull_push` to `pull`, which consumes them and sends a stop signal to itself and to `pull_push`.
+
+`sync_pubsub.rs` and `dealer_router.rs` are each self-contained, and spawn multiple threads.
 
 ### Contributing
 Feel free to open issues for anything you find an issue with. Please note that any contributed code will be licensed under the GPLv3.
