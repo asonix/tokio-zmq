@@ -51,12 +51,13 @@ impl ControlHandler for Stop {
 fn client() {
     let mut core = Core::new().unwrap();
     let ctx = Rc::new(zmq::Context::new());
-    let req: Req = Socket::new(Rc::clone(&ctx), core.handle())
+    let handle = core.handle();
+    let req: Req = Socket::create(Rc::clone(&ctx), &handle)
         .connect("tcp://localhost:5559")
         .try_into()
         .unwrap();
 
-    let zpub: Pub = Socket::new(Rc::clone(&ctx), core.handle())
+    let zpub: Pub = Socket::create(Rc::clone(&ctx), &handle)
         .bind("tcp://*:5561")
         .try_into()
         .unwrap();
@@ -103,14 +104,15 @@ fn client() {
 
 fn worker() {
     let mut core = Core::new().unwrap();
+    let handle = core.handle();
     let ctx = Rc::new(zmq::Context::new());
 
-    let rep: Rep = Socket::new(Rc::clone(&ctx), core.handle())
+    let rep: Rep = Socket::create(Rc::clone(&ctx), &handle)
         .connect("tcp://localhost:5560")
         .try_into()
         .unwrap();
 
-    let sub: Sub = Socket::new(Rc::clone(&ctx), core.handle())
+    let sub: Sub = Socket::create(Rc::clone(&ctx), &handle)
         .connect("tcp://localhost:5561")
         .filter(b"")
         .try_into()
@@ -143,24 +145,25 @@ fn worker() {
 
 fn broker() {
     let mut core = Core::new().unwrap();
+    let handle = core.handle();
     let ctx = Rc::new(zmq::Context::new());
 
-    let router: Router = Socket::new(Rc::clone(&ctx), core.handle())
+    let router: Router = Socket::create(Rc::clone(&ctx), &handle)
         .bind("tcp://*:5559")
         .try_into()
         .unwrap();
-    let sub: Sub = Socket::new(Rc::clone(&ctx), core.handle())
+    let sub: Sub = Socket::create(Rc::clone(&ctx), &handle)
         .connect("tcp://localhost:5561")
         .filter(b"")
         .try_into()
         .unwrap();
     let router = router.controlled(sub);
 
-    let dealer: Dealer = Socket::new(Rc::clone(&ctx), core.handle())
+    let dealer: Dealer = Socket::create(Rc::clone(&ctx), &handle)
         .bind("tcp://*:5560")
         .try_into()
         .unwrap();
-    let sub: Sub = Socket::new(Rc::clone(&ctx), core.handle())
+    let sub: Sub = Socket::create(Rc::clone(&ctx), &handle)
         .connect("tcp://localhost:5561")
         .filter(b"")
         .try_into()
@@ -194,9 +197,7 @@ fn broker() {
         })
         .forward(dealer.sink::<Error>());
 
-    core.handle().spawn(d2r.map(|_| ()).map_err(|e| {
-        println!("d2r bailed: {:?}", e)
-    }));
+    handle.spawn(d2r.map(|_| ()).map_err(|e| println!("d2r bailed: {:?}", e)));
     let res = core.run(r2d);
 
     if let Err(e) = res {
@@ -229,7 +230,7 @@ impl Selection {
 fn main() {
     env_logger::init().unwrap();
 
-    let selection = env::var("SELECTION").unwrap_or("all".into());
+    let selection = env::var("SELECTION").unwrap_or_else(|_| "all".into());
 
     let selection = match selection.as_ref() {
         "broker" => Selection::Broker,

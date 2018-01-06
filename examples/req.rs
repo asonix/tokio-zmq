@@ -42,12 +42,12 @@ fn main() {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
     let ctx = Rc::new(zmq::Context::new());
-    let req: Req = Socket::new(ctx, handle)
+    let req: Req = Socket::create(ctx, &handle)
         .connect("tcp://localhost:5560")
         .try_into()
         .unwrap();
 
-    let runner = iter_ok(0..10000)
+    let runner = iter_ok(0..10_000)
         .and_then(|i| {
             let mut multipart = VecDeque::new();
             let msg1 = zmq::Message::from_slice(format!("Hewwo? {}", i).as_bytes()).unwrap();

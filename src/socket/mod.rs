@@ -29,7 +29,7 @@ use tokio_core::reactor::{Handle, PollEvented};
 use tokio_file_unix::File;
 
 use prelude::*;
-use self::config::SockConfigStart;
+use self::config::SocketBuilder;
 use async::{ControlledStream, Multipart, MultipartRequest, MultipartResponse, MultipartSink,
             MultipartStream};
 use error::Error;
@@ -47,8 +47,8 @@ pub struct Socket {
 
 impl Socket {
     /// Start a new Socket Config builder
-    pub fn new(ctx: Rc<zmq::Context>, handle: Handle) -> SockConfigStart {
-        SockConfigStart::new(ctx, handle)
+    pub fn create(ctx: Rc<zmq::Context>, handle: &Handle) -> SocketBuilder {
+        SocketBuilder::new(ctx, handle)
     }
 
     /// Retrieve a Reference-Counted Pointer to self's socket.

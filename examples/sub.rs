@@ -36,7 +36,7 @@ fn main() {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
     let ctx = Rc::new(zmq::Context::new());
-    let sub: Sub = Socket::new(ctx, handle)
+    let sub: Sub = Socket::create(ctx, &handle)
         .connect("tcp://localhost:5556")
         .filter(b"")
         .try_into()

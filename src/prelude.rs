@@ -37,17 +37,17 @@ impl EndHandler for DefaultEndHandler {
 /* ----------------------------------TRAITS---------------------------------- */
 
 
-/// The AsSocket trait is implemented for all wrapper types. This makes implementing other traits a
+/// The `AsSocket` trait is implemented for all wrapper types. This makes implementing other traits a
 /// matter of saying a given type implements them.
 pub trait AsSocket {
-    /// Any type implementing AsSocket must have a way of returning a reference to a Socket.
+    /// Any type implementing `AsSocket` must have a way of returning a reference to a Socket.
     fn socket(&self) -> &Socket;
 
-    /// Any type implementing AsSocket must have a way of consuming itself and returning a socket.
+    /// Any type implementing `AsSocket` must have a way of consuming itself and returning a socket.
     fn into_socket(self) -> Socket;
 }
 
-/// Analogous to the AsSocket trait, but for Controlled sockets.
+/// Analogous to the `AsSocket` trait, but for Controlled sockets.
 pub trait AsControlledSocket {
     /// Any implementing type must have a method of getting a reference to the inner
     /// `ControlledSocket`.
@@ -55,7 +55,7 @@ pub trait AsControlledSocket {
 }
 
 /// This trait is used for types wrapping `ControlledSocket`s. It depends on the type implementing
-/// AsControlledSocket, which is analogous to the `AsSocket` trait's `socket(&self)` method.
+/// `AsControlledSocket`, which is analogous to the `AsSocket` trait's `socket(&self)` method.
 pub trait ControlledStreamSocket: AsControlledSocket {
     /// Receive a single multipart message from the socket.
     fn recv(&self) -> MultipartResponse {
@@ -136,7 +136,7 @@ pub trait IntoControlledSocket: StreamSocket {
         S: StreamSocket;
 }
 
-/// This trait provides the basic Stream support for ZeroMQ Sockets. It depends on AsSocket, but
+/// This trait provides the basic Stream support for ZeroMQ Sockets. It depends on `AsSocket`, but
 /// provides implementations for `sink` and `recv`.
 pub trait StreamSocket: AsSocket {
     /// Receive a single multipart message from the socket.
@@ -162,7 +162,7 @@ pub trait StreamSocket: AsSocket {
     /// fn main() {
     ///     let core = Core::new().unwrap();
     ///     let context = Rc::new(zmq::Context::new());
-    ///     let rep: Rep = Socket::new(context, core.handle())
+    ///     let rep: Rep = Socket::create(context, &core.handle())
     ///         .connect("tcp://localhost:5568")
     ///         .try_into()
     ///         .unwrap();
@@ -206,7 +206,7 @@ pub trait StreamSocket: AsSocket {
     /// fn main() {
     ///     let core = Core::new().unwrap();
     ///     let context = Rc::new(zmq::Context::new());
-    ///     let sub: Sub = Socket::new(context, core.handle())
+    ///     let sub: Sub = Socket::create(context, &core.handle())
     ///         .connect("tcp://localhost:5569")
     ///         .filter(b"")
     ///         .try_into()
@@ -276,7 +276,7 @@ pub trait StreamSocket: AsSocket {
     /// fn main() {
     ///     let core = Core::new().unwrap();
     ///     let context = Rc::new(zmq::Context::new());
-    ///     let sub: Sub = Socket::new(context, core.handle())
+    ///     let sub: Sub = Socket::create(context, &core.handle())
     ///         .connect("tcp://localhost:5569")
     ///         .filter(b"")
     ///         .try_into()
@@ -302,7 +302,7 @@ pub trait StreamSocket: AsSocket {
     }
 }
 
-/// This trait provides the basic Sink support for ZeroMQ Sockets. It depends on AsSocket and
+/// This trait provides the basic Sink support for ZeroMQ Sockets. It depends on `AsSocket` and
 /// provides the `send` and `sink` methods.
 pub trait SinkSocket: AsSocket {
     /// Send a single multipart message to the socket.
@@ -328,7 +328,7 @@ pub trait SinkSocket: AsSocket {
     /// fn main() {
     ///     let mut core = Core::new().unwrap();
     ///     let context = Rc::new(zmq::Context::new());
-    ///     let zpub: Pub = Socket::new(context, core.handle())
+    ///     let zpub: Pub = Socket::create(context, &core.handle())
     ///         .connect("tcp://localhost:5569")
     ///         .try_into()
     ///         .unwrap();
@@ -370,7 +370,7 @@ pub trait SinkSocket: AsSocket {
     /// fn main() {
     ///     let mut core = Core::new().unwrap();
     ///     let context = Rc::new(zmq::Context::new());
-    ///     let zpub: Pub = Socket::new(context, core.handle())
+    ///     let zpub: Pub = Socket::create(context, &core.handle())
     ///         .connect("tcp://localhost:5570")
     ///         .try_into()
     ///         .unwrap();
@@ -421,7 +421,7 @@ pub trait FutureSocket: AsSocket {
     /// fn main() {
     ///     let mut core = Core::new().unwrap();
     ///     let context = Rc::new(zmq::Context::new());
-    ///     let zpub: Pub = Socket::new(context, core.handle())
+    ///     let zpub: Pub = Socket::create(context, &core.handle())
     ///         .connect("tcp://localhost:5569")
     ///         .try_into()
     ///         .unwrap();
@@ -461,7 +461,7 @@ pub trait FutureSocket: AsSocket {
     /// fn main() {
     ///     let core = Core::new().unwrap();
     ///     let context = Rc::new(zmq::Context::new());
-    ///     let rep: Rep = Socket::new(context, core.handle())
+    ///     let rep: Rep = Socket::create(context, &core.handle())
     ///         .connect("tcp://localhost:5568")
     ///         .try_into()
     ///         .unwrap();

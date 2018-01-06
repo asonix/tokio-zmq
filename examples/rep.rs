@@ -40,7 +40,7 @@ fn main() {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
     let ctx = Rc::new(zmq::Context::new());
-    let rep: Rep = Socket::new(ctx, handle)
+    let rep: Rep = Socket::create(ctx, &handle)
         .bind("tcp://*:5560")
         .try_into()
         .unwrap();

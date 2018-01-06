@@ -20,11 +20,11 @@
 #![feature(conservative_impl_trait)]
 #![feature(try_from)]
 
-//! Tokio ZMQ, bringing Zero MQ to the Tokio event loop
+//! Tokio ZMQ, bringing ZeroMQ to the Tokio event loop
 //!
-//! This crate provides Streams, Sinks, and Futures for Zero MQ Sockets, which deal in structures
-//! caled Multiparts. Currently, a Multipart is a simple VecDeque<zmq::Message>, but possibly in
-//! the future this can be represented as a struct, or VecDeque<S: zmq::Sendable> with the zmq 0.9
+//! This crate provides Streams, Sinks, and Futures for ZeroMQ Sockets, which deal in structures
+//! caled Multiparts. Currently, a Multipart is a simple `VecDeque<zmq::Message>`, but possibly in
+//! the future this can be represented as a struct, or `VecDeque<S: zmq::Sendable>` with the zmq 0.9
 //! release.
 //!
 //! # Creating a socket
@@ -59,17 +59,18 @@
 //!     // Create a new Event Loop. Typically this will happen somewhere near the start of your
 //!     // application.
 //!     let mut core = Core::new()?;
+//!     let handle = core.handle();
 //!
 //!     // Create a new ZeroMQ Context. This context will be used to create all the sockets.
 //!     let context = Rc::new(zmq::Context::new());
 //!
 //!     // Create our two sockets using the Socket builder pattern.
 //!     // Note that the variable is named zpub, since pub is a keyword
-//!     let zpub: Pub = Socket::new(Rc::clone(&context), core.handle())
+//!     let zpub: Pub = Socket::create(Rc::clone(&context), &handle)
 //!         .bind("tcp://*:5561")
 //!         .try_into()?;
 //!
-//!     let sub: Sub = Socket::new(context, core.handle())
+//!     let sub: Sub = Socket::create(context, &handle)
 //!         .bind("tcp://*:5562")
 //!         .filter(b"")
 //!         .try_into()?;

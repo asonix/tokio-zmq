@@ -23,8 +23,8 @@ use zmq::Error as ZmqError;
 /// Defines the error type for Tokio ZMQ.
 ///
 /// Errors here can come from two places, IO, and ZeroMQ. Most errors encountered in this
-/// application are ZeroMQ errors, so Error::Zmq(_) is common, although we also need to catch IO
-/// errors from Tokio's PollEvented creation and TokioFileUnix's File creation.
+/// application are ZeroMQ errors, so `Error::Zmq(_)` is common, although we also need to catch IO
+/// errors from Tokio's `PollEvented` creation and TokioFileUnix's File creation.
 #[derive(Debug)]
 pub enum Error {
     /// Stores ZeroMQ Errors

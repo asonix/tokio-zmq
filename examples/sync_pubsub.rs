@@ -50,7 +50,7 @@ struct Stop;
 
 impl EndHandler for Stop {
     fn should_stop(&mut self, item: &VecDeque<zmq::Message>) -> bool {
-        if let Some(ref msg) = item.get(0) {
+        if let Some(msg) = item.get(0) {
             if let Some(msg) = msg.as_str() {
                 if msg == "END" {
                     return true;
@@ -64,14 +64,15 @@ impl EndHandler for Stop {
 
 fn publisher_thread() {
     let mut core = Core::new().unwrap();
+    let handle = core.handle();
     let ctx = Rc::new(zmq::Context::new());
 
-    let publisher: Pub = Socket::new(Rc::clone(&ctx), core.handle())
+    let publisher: Pub = Socket::create(Rc::clone(&ctx), &handle)
         .bind("tcp://*:5561")
         .try_into()
         .unwrap();
 
-    let syncservice: Rep = Socket::new(ctx, core.handle())
+    let syncservice: Rep = Socket::create(ctx, &handle)
         .bind("tcp://*:5562")
         .try_into()
         .unwrap();
@@ -114,15 +115,16 @@ fn publisher_thread() {
 
 fn subscriber_thread() {
     let mut core = Core::new().unwrap();
+    let handle = core.handle();
     let ctx = Rc::new(zmq::Context::new());
 
-    let subscriber: Sub = Socket::new(Rc::clone(&ctx), core.handle())
+    let subscriber: Sub = Socket::create(Rc::clone(&ctx), &handle)
         .connect("tcp://localhost:5561")
         .filter(b"")
         .try_into()
         .unwrap();
 
-    let syncclient: Req = Socket::new(ctx, core.handle())
+    let syncclient: Req = Socket::create(ctx, &handle)
         .connect("tcp://localhost:5562")
         .try_into()
         .unwrap();

@@ -47,17 +47,17 @@ fn main() {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
     let ctx = Rc::new(zmq::Context::new());
-    let cmd: Sub = Socket::new(ctx.clone(), handle.clone())
+    let cmd: Sub = Socket::create(Rc::clone(&ctx), &handle)
         .connect("tcp://localhost:5559")
         .filter(b"")
         .try_into()
         .unwrap();
-    let conn: Pull = Socket::new(ctx.clone(), handle.clone())
+    let conn: Pull = Socket::create(Rc::clone(&ctx), &handle)
         .bind("tcp://*:5558")
         .try_into()
         .unwrap();
     let conn = conn.controlled(cmd);
-    let send_cmd: Pub = Socket::new(ctx, handle.clone())
+    let send_cmd: Pub = Socket::create(ctx, &handle)
         .bind("tcp://*:5559")
         .try_into()
         .unwrap();

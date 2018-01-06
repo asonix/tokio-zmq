@@ -65,11 +65,11 @@ fn main() {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
     let ctx = Rc::new(zmq::Context::new());
-    let workers: Push = Socket::new(ctx.clone(), handle.clone())
+    let workers: Push = Socket::create(Rc::clone(&ctx), &handle)
         .bind("tcp://*:5557")
         .try_into()
         .unwrap();
-    let sink: Push = Socket::new(ctx, handle.clone())
+    let sink: Push = Socket::create(ctx, &handle)
         .connect("tcp://localhost:5558")
         .try_into()
         .unwrap();

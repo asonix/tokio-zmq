@@ -44,25 +44,25 @@ fn connect_all(sock: zmq::Socket, connects: &[&str]) -> zmq::Result<zmq::Socket>
 /// The root struct for a Socket builder
 ///
 /// This struct contains a context and a handle to the current event loop.
-pub struct SockConfigStart {
+pub struct SocketBuilder<'a> {
     ctx: Rc<zmq::Context>,
-    handle: Handle,
+    handle: &'a Handle,
 }
 
-impl SockConfigStart {
+impl<'a> SocketBuilder<'a> {
     /// Create a new Socket builder
     ///
     /// All sockets that are created through the Tokio ZMQ library will use this as the base for
     /// their socket builder (except PAIR sockets).
-    pub fn new(ctx: Rc<zmq::Context>, handle: Handle) -> Self {
-        SockConfigStart { ctx, handle }
+    pub fn new(ctx: Rc<zmq::Context>, handle: &'a Handle) -> Self {
+        SocketBuilder { ctx, handle }
     }
 
     /// Bind the socket to an address
     ///
     /// Since this is just part of the builder, and the socket doesn't exist yet, we store the
     /// address for later retrieval.
-    pub fn bind<'a>(self, addr: &'a str) -> SockConfig<'a> {
+    pub fn bind(self, addr: &'a str) -> SockConfig<'a> {
         let mut bind = Vec::new();
         bind.push(addr);
 
@@ -78,7 +78,7 @@ impl SockConfigStart {
     ///
     /// Since this is just part of the builder, and the socket doesn't exist yet, we store the
     /// address for later retrieval.
-    pub fn connect<'a>(self, addr: &'a str) -> SockConfig<'a> {
+    pub fn connect(self, addr: &'a str) -> SockConfig<'a> {
         let mut connect = Vec::new();
         connect.push(addr);
 
@@ -89,6 +89,18 @@ impl SockConfigStart {
             connect: connect,
         }
     }
+
+    /// Bind or Connect the socket to an address
+    ///
+    /// This method indicates that the resulting socket will be a PAIR socket.
+    pub fn pair(self, addr: &'a str, bind: bool) -> PairConfig<'a> {
+        PairConfig {
+            ctx: self.ctx,
+            handle: self.handle,
+            addr: addr,
+            bind: bind,
+        }
+    }
 }
 
 /// The final builder step for some socket types
@@ -97,19 +109,12 @@ impl SockConfigStart {
 /// SUB, which needs an additional `filter` parameter.
 pub struct SockConfig<'a> {
     pub ctx: Rc<zmq::Context>,
-    pub handle: Handle,
+    pub handle: &'a Handle,
     pub bind: Vec<&'a str>,
     pub connect: Vec<&'a str>,
 }
 
 impl<'a> SockConfig<'a> {
-    /// We don't want to directly construct a `SockConfig`, since bind and connect can be empty
-    ///
-    /// Create a new `SockConfigStart` instead.
-    pub fn new(ctx: Rc<zmq::Context>, handle: Handle) -> SockConfigStart {
-        SockConfigStart::new(ctx, handle)
-    }
-
     /// Bind the `SockConfig` to an address, returning a `SockConfig`
     ///
     /// This allows for a single socket to be bound to multiple addresses.
@@ -154,7 +159,7 @@ impl<'a> SockConfig<'a> {
 
         let file = Rc::new(PollEvented::new(
             File::new_nb(ZmqFile::from_raw_fd(fd))?,
-            &handle,
+            handle,
         )?);
 
         Ok(Socket::from_sock_and_file(sock, file))
@@ -175,20 +180,13 @@ impl<'a> SockConfig<'a> {
 
 pub struct SubConfig<'a> {
     pub ctx: Rc<zmq::Context>,
-    pub handle: Handle,
+    pub handle: &'a Handle,
     pub bind: Vec<&'a str>,
     pub connect: Vec<&'a str>,
     pub filter: &'a [u8],
 }
 
 impl<'a> SubConfig<'a> {
-    /// We don't want to directly construct a `SubConfig`, since bind and connect can be empty
-    ///
-    /// Create a new `SockConfigStart` instead.
-    pub fn new(ctx: Rc<zmq::Context>, handle: Handle) -> SockConfigStart {
-        SockConfigStart::new(ctx, handle)
-    }
-
     /// Finalize the `SubConfig` into a `Socket` if the creation is successful, or into an Error
     /// if something went wrong.
     ///
@@ -212,7 +210,7 @@ impl<'a> SubConfig<'a> {
         let sock = ctx.socket(zmq::SUB)?;
         let sock = bind_all(sock, &bind)?;
         let sock = connect_all(sock, &connect)?;
-        sock.set_subscribe(&filter)?;
+        sock.set_subscribe(filter)?;
 
         let fd = sock.get_fd()?;
 
@@ -220,67 +218,21 @@ impl<'a> SubConfig<'a> {
 
         let file = Rc::new(PollEvented::new(
             File::new_nb(ZmqFile::from_raw_fd(fd))?,
-            &handle,
+            handle,
         )?);
 
         Ok(Socket::from_sock_and_file(sock, file))
     }
 }
 
-/// The base type for constructing PAIR sockets
-///
-/// We require a ZeroMQ Context and a handle to the event loop.
-pub struct PairConfigStart {
-    ctx: Rc<zmq::Context>,
-    handle: Handle,
-}
-
-impl PairConfigStart {
-    /// Create the base builder type
-    pub fn new(ctx: Rc<zmq::Context>, handle: Handle) -> Self {
-        PairConfigStart { ctx, handle }
-    }
-
-    /// Bind the socket to an address
-    ///
-    /// PAIR sockets can only bind or connect to one address. Set the address, and set the bind bool
-    /// to true.
-    pub fn bind<'a>(self, addr: &'a str) -> PairConfig<'a> {
-        PairConfig {
-            ctx: self.ctx,
-            handle: self.handle,
-            addr: addr,
-            bind: true,
-        }
-    }
-
-    /// Connect the socket to an address
-    ///
-    /// PAIR sockets can only bind or connect to one address. Set the addres, and set the bind bool
-    /// to false.
-    pub fn connect<'a>(self, addr: &'a str) -> PairConfig<'a> {
-        PairConfig {
-            ctx: self.ctx,
-            handle: self.handle,
-            addr: addr,
-            bind: false,
-        }
-    }
-}
-
 pub struct PairConfig<'a> {
     ctx: Rc<zmq::Context>,
-    handle: Handle,
+    handle: &'a Handle,
     addr: &'a str,
     bind: bool,
 }
 
 impl<'a> PairConfig<'a> {
-    /// Initiate the Pair builder logic
-    pub fn new(ctx: Rc<zmq::Context>, handle: Handle) -> PairConfigStart {
-        PairConfigStart::new(ctx, handle)
-    }
-
     /// Construct a raw `Socket` type from the given `PairConfig`
     ///
     /// This build takes the same arguments as the `SockConfig`'s build method for convenience, but
@@ -308,7 +260,7 @@ impl<'a> PairConfig<'a> {
 
         let file = Rc::new(PollEvented::new(
             File::new_nb(ZmqFile::from_raw_fd(fd))?,
-            &handle,
+            handle,
         )?);
 
         Ok(Socket::from_sock_and_file(sock, file))

@@ -29,9 +29,9 @@ use error::Error;
 
 /* -------------------------------------------------------------------------- */
 
-/// The DEALER SocketType wrapper type.
+/// The DEALER `SocketType` wrapper type.
 ///
-/// Dealer implements StreamSocket and SinkSocket, and has an associated controlled variant.
+/// Dealer implements `StreamSocket` and `SinkSocket`, and has an associated controlled variant.
 #[derive(Clone, SocketWrapper)]
 #[stream]
 #[sink]
@@ -49,9 +49,9 @@ pub struct DealerControlled {
 
 /* -------------------------------------------------------------------------- */
 
-/// The PAIR SocketType wrapper type.
+/// The PAIR `SocketType` wrapper type.
 ///
-/// Pair implements StreamSocket and SinkSocket, and has an associated controlled variant.
+/// Pair implements `StreamSocket` and `SinkSocket`, and has an associated controlled variant.
 #[derive(Clone, SocketWrapper)]
 #[stream]
 #[sink]
@@ -70,9 +70,9 @@ pub struct PairControlled {
 
 /* -------------------------------------------------------------------------- */
 
-/// The PUB SocketType wrapper type
+/// The PUB `SocketType` wrapper type
 ///
-/// Pub implements SinkSocket.
+/// Pub implements `SinkSocket`.
 #[derive(Clone, SocketWrapper)]
 #[sink]
 pub struct Pub {
@@ -81,9 +81,9 @@ pub struct Pub {
 
 /* -------------------------------------------------------------------------- */
 
-/// The PULL SocketType wrapper type
+/// The PULL `SocketType` wrapper type
 ///
-/// Pull implements StreamSocket, and has an associated controlled variant.
+/// Pull implements `StreamSocket`, and has an associated controlled variant.
 #[derive(Clone, SocketWrapper)]
 #[stream]
 #[controlled = "PullControlled"]
@@ -99,9 +99,9 @@ pub struct PullControlled {
 
 /* -------------------------------------------------------------------------- */
 
-/// The PUSH SocketType wrapper type
+/// The PUSH `SocketType` wrapper type
 ///
-/// Push implements SinkSocket.
+/// Push implements `SinkSocket`.
 #[derive(Clone, SocketWrapper)]
 #[sink]
 pub struct Push {
@@ -110,9 +110,9 @@ pub struct Push {
 
 /* -------------------------------------------------------------------------- */
 
-/// The REP SocketType wrapper type
+/// The REP `SocketType` wrapper type
 ///
-/// Rep implements StreamSocket and SinkSocket, and has an associated controlled variant.
+/// Rep implements `StreamSocket` and `SinkSocket`, and has an associated controlled variant.
 #[derive(Clone, SocketWrapper)]
 #[stream]
 #[sink]
@@ -130,9 +130,9 @@ pub struct RepControlled {
 
 /* -------------------------------------------------------------------------- */
 
-/// The REQ SocketType wrapper type
+/// The REQ `SocketType` wrapper type
 ///
-/// Req implements FutureSocket.
+/// Req implements `FutureSocket`.
 #[derive(Clone, SocketWrapper)]
 #[future]
 pub struct Req {
@@ -141,9 +141,9 @@ pub struct Req {
 
 /* -------------------------------------------------------------------------- */
 
-/// The ROUTER SocketType wrapper type
+/// The ROUTER `SocketType` wrapper type
 ///
-/// Router implements StreamSocket and SinkSocket, and has an associated controlled variant.
+/// Router implements `StreamSocket` and `SinkSocket`, and has an associated controlled variant.
 #[derive(Clone, SocketWrapper)]
 #[stream]
 #[sink]
@@ -161,9 +161,9 @@ pub struct RouterControlled {
 
 /* -------------------------------------------------------------------------- */
 
-/// The SUB SocketType wrapper type
+/// The SUB `SocketType` wrapper type
 ///
-/// Sub implements StreamSocket, and has an associated controlled variant.
+/// Sub implements `StreamSocket`, and has an associated controlled variant.
 #[derive(Clone, SocketWrapper)]
 #[stream]
 #[controlled = "SubControlled"]
@@ -180,9 +180,9 @@ pub struct SubControlled {
 
 /* -------------------------------------------------------------------------- */
 
-/// The XPUB SocketType wrapper type
+/// The XPUB `SocketType` wrapper type
 ///
-/// Xpub implements StreamSocket and SinkSocket, and has an associated controlled variant.
+/// Xpub implements `StreamSocket` and `SinkSocket`, and has an associated controlled variant.
 #[derive(Clone, SocketWrapper)]
 #[stream]
 #[sink]
@@ -200,9 +200,9 @@ pub struct XpubControlled {
 
 /* -------------------------------------------------------------------------- */
 
-/// The XSUB SocketType wrapper type
+/// The XSUB `SocketType` wrapper type
 ///
-/// Xsub implements StreamSocket and SinkSocket, and has an associated controlled variant.
+/// Xsub implements `StreamSocket` and `SinkSocket`, and has an associated controlled variant.
 #[derive(Clone, SocketWrapper)]
 #[stream]
 #[sink]

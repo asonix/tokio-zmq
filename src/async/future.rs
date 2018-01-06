@@ -20,7 +20,6 @@
 //! This module contains definitions for `MultipartRequest` and `MultipartResponse`, the two types that
 //! implement `futures::Future`.
 
-use std::collections::VecDeque;
 use std::rc::Rc;
 
 use zmq;
@@ -62,7 +61,7 @@ use file::ZmqFile;
 /// # fn get_sock() -> impl Future<Item = (), Error = Error> {
 /// #     let core = Core::new().unwrap();
 /// #     let ctx = Rc::new(zmq::Context::new());
-/// #     let rep: Rep = Socket::new(ctx, core.handle())
+/// #     let rep: Rep = Socket::create(ctx, &core.handle())
 /// #         .bind("tcp://*:5567")
 /// #         .try_into()
 /// #         .unwrap();
@@ -126,7 +125,7 @@ impl MultipartRequest {
                 MsgPlace::Nth
             };
 
-            match self.send_msg(msg, place)? {
+            match self.send_msg(msg, &place)? {
                 AsyncSink::Ready => {
                     debug!("MultipartRequest: Sent!");
 
@@ -149,7 +148,7 @@ impl MultipartRequest {
     fn send_msg(
         &mut self,
         msg: zmq::Message,
-        place: MsgPlace,
+        place: &MsgPlace,
     ) -> Result<AsyncSink<zmq::Message>, Error> {
         debug!("MultipartRequest: send_msg");
         let events = self.sock.get_events()? as i16;
@@ -162,7 +161,7 @@ impl MultipartRequest {
         }
 
         let flags = zmq::DONTWAIT |
-            if place == MsgPlace::Last {
+            if *place == MsgPlace::Last {
                 0
             } else {
                 zmq::SNDMORE
@@ -244,7 +243,7 @@ impl Future for MultipartRequest {
 /// # fn get_sock() -> impl Future<Item = Multipart, Error = Error> {
 /// #     let core = Core::new().unwrap();
 /// #     let ctx = Rc::new(zmq::Context::new());
-/// #     let rep: Rep = Socket::new(ctx, core.handle())
+/// #     let rep: Rep = Socket::create(ctx, &core.handle())
 /// #         .bind("tcp://*:5567")
 /// #         .try_into()
 /// #         .unwrap();
@@ -291,7 +290,7 @@ impl MultipartResponse {
             match self.recv_msg()? {
                 Async::Ready(msg) => {
                     first = false;
-                    let mut multipart = self.multipart.take().unwrap_or(VecDeque::new());
+                    let mut multipart = self.multipart.take().unwrap_or_default();
 
                     let more = msg.get_more();
 
