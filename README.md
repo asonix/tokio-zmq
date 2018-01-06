@@ -25,7 +25,7 @@ See the [examples folder](https://github.com/asonix/zmq-futures/tree/master/exam
 Add the following to your Cargo.toml
 ```toml
 zmq = "0.8"
-tokio-zmq = "0.1.3"
+tokio-zmq = "0.2.0"
 futures = "0.1"
 tokio-core = "0.1"
 ```
