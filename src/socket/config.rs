@@ -17,6 +17,8 @@
  * along with Tokio ZMQ.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+//! This module contains `SocketBuilder` and related types.
+
 use std::rc::Rc;
 
 use zmq;

@@ -26,6 +26,10 @@ use error::Error;
 
 /* ----------------------------------TYPES----------------------------------- */
 
+/// The Default `EndHandler` struct. This type is never instantiated, but instead is used in place
+/// of a generic type for the default `MultipartStream` type.
+///
+/// It's `should_stop` method always returns false, although it should never be called.
 pub struct DefaultEndHandler;
 
 impl EndHandler for DefaultEndHandler {
