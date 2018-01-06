@@ -178,6 +178,9 @@ impl<'a> SockConfig<'a> {
     }
 }
 
+/// The final builder step for the Sub socket type.
+///
+/// This contains all the information required to contstruct a valid SUB socket
 pub struct SubConfig<'a> {
     pub ctx: Rc<zmq::Context>,
     pub handle: &'a Handle,
@@ -225,6 +228,9 @@ impl<'a> SubConfig<'a> {
     }
 }
 
+/// The final builder step for the Pair socket type.
+///
+/// This contains all the information required to contstruct a valid PAIR socket
 pub struct PairConfig<'a> {
     ctx: Rc<zmq::Context>,
     handle: &'a Handle,

@@ -19,7 +19,7 @@
 
 //! This module contains useful traits and types for working with ZeroMQ Sockets.
 
-mod config;
+pub mod config;
 pub mod types;
 
 use std::rc::Rc;
