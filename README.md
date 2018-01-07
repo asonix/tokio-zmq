@@ -1,6 +1,6 @@
 # Tokio ZMQ
 
-[documentation](https://docs.rs/tokio-zmq/0.1.0/tokio_zmq/)
+[documentation](https://docs.rs/tokio-zmq/)
 [crates.io](https://crates.io/crates/tokio-zmq)
 
 This crate contains wrappers around ZeroMQ Concepts with Futures.
