@@ -2,9 +2,9 @@ extern crate proc_macro;
 extern crate syn;
 
 #[macro_use]
-extern crate synstructure;
-#[macro_use]
 extern crate quote;
+#[macro_use]
+extern crate synstructure;
 
 decl_derive!([SocketWrapper, attributes(stream, sink, controlled, try_from)] => socket_derive);
 decl_derive!([ControlledSocketWrapper, attributes(sink)] => controlled_socket_derive);
@@ -26,14 +26,14 @@ fn socket_derive(s: synstructure::Structure) -> quote::Tokens {
         let as_socket = s.bound_impl(
             "::prelude::AsSocket",
             quote! {
-            fn socket(&self) -> &Socket {
-                &self.inner
-            }
+                fn socket(&self) -> &Socket {
+                    &self.inner
+                }
 
-            fn into_socket(self) -> Socket {
-                self.inner
-            }
-        },
+                fn into_socket(self) -> Socket {
+                    self.inner
+                }
+            },
         );
 
         let name = sb.ast().ident;
@@ -122,17 +122,17 @@ fn into_controlled(s: &synstructure::Structure) -> quote::Tokens {
         s.bound_impl(
             "::prelude::IntoControlledSocket",
             quote! {
-            type Controlled = #control;
+                type Controlled = #control;
 
-            fn controlled<S>(self, control: S) -> Self::Controlled
-            where
-                S: ::prelude::StreamSocket,
-            {
-                #control {
-                    inner: self.inner.controlled(control)
+                fn controlled<S>(self, control: S) -> Self::Controlled
+                where
+                    S: ::prelude::StreamSocket,
+                {
+                    #control {
+                        inner: self.inner.controlled(control)
+                    }
                 }
-            }
-        },
+            },
         )
     } else {
         quote!{}
@@ -156,10 +156,10 @@ fn controlled_socket_derive(s: synstructure::Structure) -> quote::Tokens {
         let as_socket = s.bound_impl(
             "::prelude::AsControlledSocket",
             quote! {
-            fn socket(&self) -> &ControlledSocket {
-                &self.inner
-            }
-        },
+                fn socket(&self) -> &ControlledSocket {
+                    &self.inner
+                }
+            },
         );
 
         let stream = s.bound_impl("::prelude::ControlledStreamSocket", quote!{});

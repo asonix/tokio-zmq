@@ -191,7 +191,11 @@ fn worker_task(worker_num: usize) -> usize {
         .and_then(|multipart| {
             let mut envelope: Envelope = multipart.try_into()?;
 
-            println!("Worker: {:?} from {:?}", envelope.request().as_str(), envelope.addr().as_str());
+            println!(
+                "Worker: {:?} from {:?}",
+                envelope.request().as_str(),
+                envelope.addr().as_str()
+            );
 
             let msg = zmq::Message::from_slice(b"OK")?;
             envelope.set_request(msg);
@@ -327,8 +331,7 @@ fn main() {
     let mut broker_thread = None;
 
     match use_broker {
-        UseBroker::Yes |
-        UseBroker::All => {
+        UseBroker::Yes | UseBroker::All => {
             // Spawn threads
             broker_thread = Some(thread::spawn(broker_task));
         }
@@ -336,8 +339,7 @@ fn main() {
     }
 
     match use_broker {
-        UseBroker::No |
-        UseBroker::All => {
+        UseBroker::No | UseBroker::All => {
             // Set up control socket
             let mut core = Core::new().unwrap();
             let context = Rc::new(zmq::Context::new());
