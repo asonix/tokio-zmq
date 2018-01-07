@@ -23,9 +23,9 @@
 //! Tokio ZMQ, bringing ZeroMQ to the Tokio event loop
 //!
 //! This crate provides Streams, Sinks, and Futures for ZeroMQ Sockets, which deal in structures
-//! caled Multiparts. Currently, a Multipart is a simple `VecDeque<zmq::Message>`, but possibly in
-//! the future this can be represented as a struct, or `VecDeque<S: zmq::Sendable>` with the zmq 0.9
-//! release.
+//! caled Multiparts. Currently, a Multipart is a simple wrapper around `VecDeque<zmq::Message>`,
+//! but in the future this will be represented as a wrapper around `VecDeque<S: zmq::Sendable>`
+//! with the zmq 0.9 release.
 //!
 //! # Creating a socket
 //!

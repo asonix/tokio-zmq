@@ -52,7 +52,7 @@ fn main() {
 
     let runner = rep.stream()
         .and_then(|multipart| {
-            // handle the multipart (VecDeque<zmq::Message>)
+            // handle the Multipart
             // This example simply echos the incoming data back to the client.
             Ok(multipart)
         })

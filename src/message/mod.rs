@@ -35,9 +35,8 @@ use zmq;
 /// extern crate tokio_zmq;
 ///
 /// use std::convert::{TryFrom, TryInto};
-/// use std::collections::VecDeque;
 ///
-/// use tokio_zmq::async::Multipart;
+/// use tokio_zmq::Multipart;
 ///
 /// #[derive(Debug)]
 /// enum Error {
@@ -73,7 +72,7 @@ use zmq;
 ///
 /// impl From<Envelope> for Multipart {
 ///     fn from(envelope: Envelope) -> Self {
-///         let mut multipart = VecDeque::new();
+///         let mut multipart = Multipart::new();
 ///
 ///         multipart.push_back(envelope.filter);
 ///         multipart.push_back(envelope.address);
@@ -84,7 +83,7 @@ use zmq;
 /// }
 ///
 /// fn main() {
-///     let mut multipart: Multipart = VecDeque::new();
+///     let mut multipart: Multipart = Multipart::new();
 ///     multipart.push_back(zmq::Message::from_slice(b"FILTER: asdf").unwrap());
 ///     multipart.push_back(zmq::Message::from_slice(b"some.address").unwrap());
 ///     multipart.push_back(zmq::Message::from_slice(b"Some content").unwrap());

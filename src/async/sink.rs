@@ -48,12 +48,11 @@ use file::ZmqFile;
 /// extern crate tokio_zmq;
 ///
 /// use std::rc::Rc;
-/// use std::collections::VecDeque;
 ///
 /// use futures::{Future, Sink};
 /// use tokio_core::reactor::Core;
-/// use tokio_zmq::async::{Multipart, MultipartStream};
-/// use tokio_zmq::{Error, Socket};
+/// use tokio_zmq::async::{MultipartStream};
+/// use tokio_zmq::{Error, Multipart, Socket};
 ///
 /// fn get_sink(socket: Socket) -> impl Sink<SinkItem = Multipart, SinkError = Error> {
 ///     socket.sink()
@@ -70,10 +69,7 @@ use file::ZmqFile;
 ///
 ///     let msg = zmq::Message::from_slice(b"Some message").unwrap();
 ///
-///     let mut multipart = VecDeque::new();
-///     multipart.push_back(msg);
-///
-///     core.run(sink.send(multipart)).unwrap();
+///     core.run(sink.send(msg.into())).unwrap();
 /// }
 /// ```
 pub struct MultipartSink<E>

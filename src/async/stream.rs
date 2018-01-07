@@ -48,8 +48,8 @@ use file::ZmqFile;
 ///
 /// use futures::Stream;
 /// use tokio_core::reactor::Core;
-/// use tokio_zmq::async::{Multipart, MultipartStream};
-/// use tokio_zmq::{Error, Socket};
+/// use tokio_zmq::async::MultipartStream;
+/// use tokio_zmq::{Error, Multipart, Socket};
 ///
 /// fn get_stream(socket: Socket) -> impl Stream<Item = Multipart, Error = Error> {
 ///     socket.stream().and_then(|multipart| {

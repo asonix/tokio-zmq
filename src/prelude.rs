@@ -161,8 +161,8 @@ pub trait StreamSocket: AsSocket {
     /// use futures::Future;
     /// use tokio_core::reactor::Core;
     /// use tokio_zmq::prelude::*;
-    /// use tokio_zmq::async::{Multipart, MultipartStream};
-    /// use tokio_zmq::{Error, Rep, Socket};
+    /// use tokio_zmq::async::MultipartStream;
+    /// use tokio_zmq::{Error, Multipart, Rep, Socket};
     ///
     /// fn main() {
     ///     let core = Core::new().unwrap();
@@ -205,8 +205,8 @@ pub trait StreamSocket: AsSocket {
     /// use futures::Stream;
     /// use tokio_core::reactor::Core;
     /// use tokio_zmq::prelude::*;
-    /// use tokio_zmq::async::{Multipart, MultipartStream};
-    /// use tokio_zmq::{Error, Socket, Sub};
+    /// use tokio_zmq::async::{MultipartStream};
+    /// use tokio_zmq::{Error, Multipart, Socket, Sub};
     ///
     /// fn main() {
     ///     let core = Core::new().unwrap();
@@ -251,8 +251,8 @@ pub trait StreamSocket: AsSocket {
     /// use futures::Stream;
     /// use tokio_core::reactor::Core;
     /// use tokio_zmq::prelude::*;
-    /// use tokio_zmq::async::{Multipart, MultipartStream};
-    /// use tokio_zmq::{Error, Socket, Sub};
+    /// use tokio_zmq::async::MultipartStream;
+    /// use tokio_zmq::{Error, Multipart, Socket, Sub};
     ///
     /// struct Stop {
     ///     count: usize,
@@ -323,11 +323,10 @@ pub trait SinkSocket: AsSocket {
     ///
     /// use std::rc::Rc;
     /// use std::convert::TryInto;
-    /// use std::collections::VecDeque;
     ///
     /// use tokio_core::reactor::Core;
     /// use tokio_zmq::prelude::*;
-    /// use tokio_zmq::async::{Multipart, MultipartStream};
+    /// use tokio_zmq::async::MultipartStream;
     /// use tokio_zmq::{Error, Pub, Socket};
     ///
     /// fn main() {
@@ -339,10 +338,8 @@ pub trait SinkSocket: AsSocket {
     ///         .unwrap();
     ///
     ///     let msg = zmq::Message::from_slice(b"Hello").unwrap();
-    ///     let mut multipart = VecDeque::new();
-    ///     multipart.push_back(msg);
     ///
-    ///     let fut = zpub.send(multipart);
+    ///     let fut = zpub.send(msg.into());
     ///
     ///     core.run(fut).unwrap();
     /// }
@@ -363,14 +360,13 @@ pub trait SinkSocket: AsSocket {
     ///
     /// use std::rc::Rc;
     /// use std::convert::TryInto;
-    /// use std::collections::VecDeque;
     ///
     /// use futures::Stream;
     /// use futures::stream::iter_ok;
     /// use tokio_core::reactor::Core;
     /// use tokio_zmq::prelude::*;
-    /// use tokio_zmq::async::{Multipart, MultipartStream};
-    /// use tokio_zmq::{Error, Pub, Socket};
+    /// use tokio_zmq::async::MultipartStream;
+    /// use tokio_zmq::{Error, Multipart, Pub, Socket};
     ///
     /// fn main() {
     ///     let mut core = Core::new().unwrap();
@@ -383,9 +379,7 @@ pub trait SinkSocket: AsSocket {
     ///     let fut = iter_ok(0..5)
     ///         .and_then(|i| {
     ///             let msg = zmq::Message::from_slice(format!("i: {}", i).as_bytes())?;
-    ///             let mut multipart = VecDeque::new();
-    ///             multipart.push_back(msg);
-    ///             Ok(multipart) as Result<Multipart, Error>
+    ///             Ok(msg.into()) as Result<Multipart, Error>
     ///         })
     ///         .forward(zpub.sink::<Error>());
     ///
@@ -416,12 +410,11 @@ pub trait FutureSocket: AsSocket {
     ///
     /// use std::rc::Rc;
     /// use std::convert::TryInto;
-    /// use std::collections::VecDeque;
     ///
     /// use tokio_core::reactor::Core;
     /// use tokio_zmq::prelude::*;
-    /// use tokio_zmq::async::{Multipart, MultipartStream};
-    /// use tokio_zmq::{Error, Pub, Socket};
+    /// use tokio_zmq::async::MultipartStream;
+    /// use tokio_zmq::{Pub, Socket};
     ///
     /// fn main() {
     ///     let mut core = Core::new().unwrap();
@@ -432,10 +425,8 @@ pub trait FutureSocket: AsSocket {
     ///         .unwrap();
     ///
     ///     let msg = zmq::Message::from_slice(b"Hello").unwrap();
-    ///     let mut multipart = VecDeque::new();
-    ///     multipart.push_back(msg);
     ///
-    ///     let fut = zpub.send(multipart);
+    ///     let fut = zpub.send(msg.into());
     ///
     ///     core.run(fut).unwrap();
     /// }
@@ -460,8 +451,8 @@ pub trait FutureSocket: AsSocket {
     /// use futures::Future;
     /// use tokio_core::reactor::Core;
     /// use tokio_zmq::prelude::*;
-    /// use tokio_zmq::async::{Multipart, MultipartStream};
-    /// use tokio_zmq::{Error, Rep, Socket};
+    /// use tokio_zmq::async::MultipartStream;
+    /// use tokio_zmq::{Rep, Socket};
     ///
     /// fn main() {
     ///     let core = Core::new().unwrap();

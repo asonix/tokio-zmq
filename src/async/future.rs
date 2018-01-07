@@ -48,7 +48,6 @@ use file::ZmqFile;
 /// #
 /// # use std::rc::Rc;
 /// # use std::convert::TryInto;
-/// # use std::collections::VecDeque;
 /// #
 /// # use futures::Future;
 /// # use tokio_core::reactor::Core;
@@ -69,10 +68,8 @@ use file::ZmqFile;
 /// #     let socket = rep.socket();
 /// #     let sock = socket.inner_sock();
 /// #     let file = socket.inner_file();
-/// #     let mut multipart = VecDeque::new();
 /// #     let msg = zmq::Message::from_slice(format!("Hey").as_bytes()).unwrap();
-/// #     multipart.push_back(msg);
-/// MultipartRequest::new(sock, file, multipart).and_then(|_| {
+/// MultipartRequest::new(sock, file, msg.into()).and_then(|_| {
 ///     // succesfull request
 ///     # Ok(())
 /// })
@@ -230,13 +227,12 @@ impl Future for MultipartRequest {
 /// #
 /// # use std::rc::Rc;
 /// # use std::convert::TryInto;
-/// # use std::collections::VecDeque;
 /// #
 /// # use futures::Future;
 /// # use tokio_core::reactor::Core;
 /// # use tokio_zmq::prelude::*;
-/// # use tokio_zmq::async::{Multipart, MultipartResponse};
-/// # use tokio_zmq::{Error, Rep, Socket};
+/// # use tokio_zmq::async::{MultipartResponse};
+/// # use tokio_zmq::{Error, Multipart, Rep, Socket};
 /// #
 /// # fn main() {
 /// #     get_sock();
