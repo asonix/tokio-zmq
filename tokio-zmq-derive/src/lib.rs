@@ -6,7 +6,7 @@ extern crate synstructure;
 #[macro_use]
 extern crate quote;
 
-decl_derive!([SocketWrapper, attributes(stream, sink, future, controlled, try_from)] => socket_derive);
+decl_derive!([SocketWrapper, attributes(stream, sink, controlled, try_from)] => socket_derive);
 decl_derive!([ControlledSocketWrapper, attributes(sink)] => controlled_socket_derive);
 
 fn socket_derive(s: synstructure::Structure) -> quote::Tokens {
@@ -51,19 +51,12 @@ fn socket_derive(s: synstructure::Structure) -> quote::Tokens {
             quote!{}
         };
 
-        let future = if has_attr(&s, "future") {
-            s.bound_impl("::prelude::FutureSocket", quote!{})
-        } else {
-            quote!{}
-        };
-
         let controlled = into_controlled(&s);
 
         quote! {
             #as_socket
             #stream
             #sink
-            #future
             #controlled
             #try_from
         }

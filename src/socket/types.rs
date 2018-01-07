@@ -132,11 +132,20 @@ pub struct RepControlled {
 
 /// The REQ `SocketType` wrapper type
 ///
-/// Req implements `FutureSocket`.
+/// Req implements `StreamSocket` and `SinkSocket`, and has an associated controlled variant.
 #[derive(Clone, SocketWrapper)]
-#[future]
+#[stream]
+#[sink]
+#[controlled = "ReqControlled"]
 pub struct Req {
     inner: Socket,
+}
+
+/// The controlled variant of Req
+#[derive(Clone, ControlledSocketWrapper)]
+#[sink]
+pub struct ReqControlled {
+    inner: ControlledSocket,
 }
 
 /* -------------------------------------------------------------------------- */

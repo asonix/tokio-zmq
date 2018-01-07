@@ -92,6 +92,7 @@ use zmq;
 ///     let multipart2: Multipart = envelope.into();
 /// }
 /// ```
+#[derive(Debug)]
 pub struct Multipart {
     inner: VecDeque<zmq::Message>,
 }

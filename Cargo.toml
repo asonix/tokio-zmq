@@ -14,7 +14,7 @@ futures = "0.1"
 tokio-core = "0.1"
 tokio-file-unix = "0.4"
 log = "0.4"
-tokio-zmq-derive = { path = "tokio-zmq-derive", version = "0.1.0" }
+tokio-zmq-derive = { path = "tokio-zmq-derive", version = "0.1.1" }
 
 [dev-dependencies]
 env_logger = "0.4"
