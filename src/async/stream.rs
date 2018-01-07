@@ -124,6 +124,7 @@ where
             }
             Async::NotReady => {
                 self.response = Some(response);
+                self.file.need_read();
                 Ok(Async::NotReady)
             }
         }
@@ -138,7 +139,6 @@ where
     type Error = Error;
 
     fn poll(&mut self) -> Poll<Option<Multipart>, Error> {
-        debug!("MultipartStream: In poll");
         if let Some(response) = self.response.take() {
             self.poll_response(response)
         } else {
@@ -226,7 +226,6 @@ where
     /// If the control stream is ready with a Multipart, use the `ControlHandler` to
     /// determine if the producting stream should be stopped.
     fn poll(&mut self) -> Poll<Option<Multipart>, Error> {
-        debug!("ControlledStream: in poll");
         let stop = match self.control.poll()? {
             Async::NotReady => false,
             Async::Ready(None) => true,

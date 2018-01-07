@@ -38,6 +38,8 @@ use tokio_zmq::prelude::*;
 use tokio_zmq::{Dealer, Pub, Rep, Req, Router, Sub};
 use tokio_zmq::{Error, Multipart, Socket};
 
+const CLIENT_REQUESTS: usize = 1000;
+
 pub struct Stop;
 
 impl ControlHandler for Stop {
@@ -61,7 +63,7 @@ fn client() {
         .try_into()
         .unwrap();
 
-    let runner = iter_ok(0..10)
+    let runner = iter_ok(0..CLIENT_REQUESTS)
         .and_then(|request_nbr| {
             let msg = zmq::Message::from_slice(b"Hewwo?").unwrap();
 

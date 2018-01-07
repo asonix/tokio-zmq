@@ -49,6 +49,7 @@ fn connect_all(sock: zmq::Socket, connects: &[&str]) -> zmq::Result<zmq::Socket>
 pub struct SocketBuilder<'a> {
     ctx: Rc<zmq::Context>,
     handle: &'a Handle,
+    identity: Option<&'a [u8]>,
 }
 
 impl<'a> SocketBuilder<'a> {
@@ -57,7 +58,20 @@ impl<'a> SocketBuilder<'a> {
     /// All sockets that are created through the Tokio ZMQ library will use this as the base for
     /// their socket builder (except PAIR sockets).
     pub fn new(ctx: Rc<zmq::Context>, handle: &'a Handle) -> Self {
-        SocketBuilder { ctx, handle }
+        SocketBuilder {
+            ctx: ctx,
+            handle: handle,
+            identity: None,
+        }
+    }
+
+    /// Give the socket a custom identity
+    pub fn identity(self, identity: &'a [u8]) -> Self {
+        SocketBuilder {
+            ctx: self.ctx,
+            handle: self.handle,
+            identity: Some(identity),
+        }
     }
 
     /// Bind the socket to an address
@@ -73,6 +87,7 @@ impl<'a> SocketBuilder<'a> {
             handle: self.handle,
             bind: bind,
             connect: Vec::new(),
+            identity: self.identity,
         }
     }
 
@@ -89,6 +104,7 @@ impl<'a> SocketBuilder<'a> {
             handle: self.handle,
             bind: Vec::new(),
             connect: connect,
+            identity: self.identity,
         }
     }
 
@@ -101,6 +117,7 @@ impl<'a> SocketBuilder<'a> {
             handle: self.handle,
             addr: addr,
             bind: bind,
+            identity: self.identity,
         }
     }
 }
@@ -114,6 +131,7 @@ pub struct SockConfig<'a> {
     pub handle: &'a Handle,
     pub bind: Vec<&'a str>,
     pub connect: Vec<&'a str>,
+    pub identity: Option<&'a [u8]>,
 }
 
 impl<'a> SockConfig<'a> {
@@ -149,9 +167,13 @@ impl<'a> SockConfig<'a> {
             handle,
             bind,
             connect,
+            identity,
         } = self;
 
         let sock = ctx.socket(kind)?;
+        if let Some(identity) = identity {
+            sock.set_identity(identity)?;
+        }
         let sock = bind_all(sock, &bind)?;
         let sock = connect_all(sock, &connect)?;
 
@@ -175,6 +197,7 @@ impl<'a> SockConfig<'a> {
             handle: self.handle,
             bind: self.bind,
             connect: self.connect,
+            identity: self.identity,
             filter: pattern,
         }
     }
@@ -189,6 +212,7 @@ pub struct SubConfig<'a> {
     pub bind: Vec<&'a str>,
     pub connect: Vec<&'a str>,
     pub filter: &'a [u8],
+    pub identity: Option<&'a [u8]>,
 }
 
 impl<'a> SubConfig<'a> {
@@ -210,9 +234,13 @@ impl<'a> SubConfig<'a> {
             bind,
             connect,
             filter,
+            identity,
         } = self;
 
         let sock = ctx.socket(zmq::SUB)?;
+        if let Some(identity) = identity {
+            sock.set_identity(identity)?;
+        }
         let sock = bind_all(sock, &bind)?;
         let sock = connect_all(sock, &connect)?;
         sock.set_subscribe(filter)?;
@@ -238,6 +266,7 @@ pub struct PairConfig<'a> {
     handle: &'a Handle,
     addr: &'a str,
     bind: bool,
+    identity: Option<&'a [u8]>,
 }
 
 impl<'a> PairConfig<'a> {
@@ -253,9 +282,13 @@ impl<'a> PairConfig<'a> {
             handle,
             addr,
             bind,
+            identity,
         } = self;
 
         let sock = ctx.socket(zmq::PAIR)?;
+        if let Some(identity) = identity {
+            sock.set_identity(identity)?;
+        }
         if bind {
             sock.bind(addr)?;
         } else {

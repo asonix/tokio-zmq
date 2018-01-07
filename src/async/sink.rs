@@ -125,7 +125,6 @@ where
         &mut self,
         multipart: Self::SinkItem,
     ) -> StartSend<Self::SinkItem, Self::SinkError> {
-        debug!("MultipartSink: start_send");
         if let Some(request) = self.request.take() {
             match self.poll_request(request)? {
                 Async::Ready(()) => {
@@ -145,7 +144,6 @@ where
     }
 
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        debug!("MultipartSink: poll_complete");
         if let Some(request) = self.request.take() {
             self.poll_request(request)
         } else {
