@@ -29,7 +29,7 @@ use futures::{Async, AsyncSink, Future, Poll};
 use futures::task;
 
 use error::Error;
-use super::{MsgPlace};
+use super::MsgPlace;
 use message::Multipart;
 use file::ZmqFile;
 
@@ -158,12 +158,11 @@ impl MultipartRequest {
             return Ok(AsyncSink::NotReady(msg));
         }
 
-        let flags = zmq::DONTWAIT |
-            if *place == MsgPlace::Last {
-                0
-            } else {
-                zmq::SNDMORE
-            };
+        let flags = zmq::DONTWAIT | if *place == MsgPlace::Last {
+            0
+        } else {
+            zmq::SNDMORE
+        };
 
         match self.sock.send_msg(msg, flags) {
             Ok(_) => Ok(AsyncSink::Ready),

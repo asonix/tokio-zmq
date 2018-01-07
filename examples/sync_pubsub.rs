@@ -19,12 +19,12 @@
 
 #![feature(try_from)]
 
-extern crate futures;
-extern crate tokio_core;
-extern crate zmq;
-extern crate tokio_zmq;
-extern crate log;
 extern crate env_logger;
+extern crate futures;
+extern crate log;
+extern crate tokio_core;
+extern crate tokio_zmq;
+extern crate zmq;
 
 use std::rc::Rc;
 use std::convert::TryInto;
@@ -35,8 +35,8 @@ use futures::stream::iter_ok;
 use futures::{Future, Stream};
 use tokio_core::reactor::Core;
 use tokio_zmq::prelude::*;
-use tokio_zmq::{Rep, Req, Pub, Sub};
-use tokio_zmq::{Socket, Multipart, Error};
+use tokio_zmq::{Pub, Rep, Req, Sub};
+use tokio_zmq::{Error, Multipart, Socket};
 
 // On my quad-core i7, if I run with too many threads, the context switching takes too long and
 // some messages get dropped. 2 subscribers can properly retrieve 1 million messages each, though.
@@ -80,17 +80,13 @@ fn publisher_thread() {
 
     let runner = iter_ok(0..SUBSCRIBERS)
         .zip(syncservice.stream())
-        .map(|(_, _)| {
-            zmq::Message::from_slice(b"").unwrap().into()
-        })
+        .map(|(_, _)| zmq::Message::from_slice(b"").unwrap().into())
         .forward(syncservice.sink::<Error>())
         .and_then(|_| {
             println!("Broadcasting message");
 
             iter_ok(0..MESSAGES)
-                .map(|_| {
-                    zmq::Message::from_slice(b"Rhubarb").unwrap().into()
-                })
+                .map(|_| zmq::Message::from_slice(b"Rhubarb").unwrap().into())
                 .forward(publisher.sink::<Error>())
         })
         .and_then(|_| {

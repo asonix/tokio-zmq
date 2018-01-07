@@ -19,12 +19,12 @@
 
 #![feature(try_from)]
 
-extern crate futures;
-extern crate tokio_core;
-extern crate zmq;
-extern crate tokio_zmq;
-extern crate log;
 extern crate env_logger;
+extern crate futures;
+extern crate log;
+extern crate tokio_core;
+extern crate tokio_zmq;
+extern crate zmq;
 
 use std::rc::Rc;
 use std::convert::TryInto;
@@ -35,8 +35,8 @@ use futures::stream::iter_ok;
 use futures::{Future, Stream};
 use tokio_core::reactor::Core;
 use tokio_zmq::prelude::*;
-use tokio_zmq::{Dealer, Rep, Req, Router, Pub, Sub};
-use tokio_zmq::{Socket, Multipart, Error};
+use tokio_zmq::{Dealer, Pub, Rep, Req, Router, Sub};
+use tokio_zmq::{Error, Multipart, Socket};
 
 pub struct Stop;
 
@@ -70,9 +70,7 @@ fn client() {
             let response = req.recv();
             let request = req.send(msg.into());
 
-            request.and_then(move |_| {
-                response.map(move |multipart| (request_nbr, multipart))
-            })
+            request.and_then(move |_| response.map(move |multipart| (request_nbr, multipart)))
         })
         .for_each(|(request_nbr, multipart)| {
             for msg in multipart {

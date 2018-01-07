@@ -20,8 +20,7 @@
 //! Provide useful types and traits for working with Tokio ZMQ.
 
 use socket::{ControlledSocket, Socket};
-use async::{ControlledStream, MultipartRequest, MultipartResponse, MultipartSink,
-            MultipartStream};
+use async::{ControlledStream, MultipartRequest, MultipartResponse, MultipartSink, MultipartStream};
 use message::Multipart;
 use error::Error;
 
@@ -40,7 +39,6 @@ impl EndHandler for DefaultEndHandler {
 }
 
 /* ----------------------------------TRAITS---------------------------------- */
-
 
 /// The `AsSocket` trait is implemented for all wrapper types. This makes implementing other traits a
 /// matter of saying a given type implements them.

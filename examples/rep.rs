@@ -19,12 +19,12 @@
 
 #![feature(try_from)]
 
-extern crate futures;
-extern crate tokio_core;
-extern crate zmq;
-extern crate tokio_zmq;
-extern crate log;
 extern crate env_logger;
+extern crate futures;
+extern crate log;
+extern crate tokio_core;
+extern crate tokio_zmq;
+extern crate zmq;
 
 use std::rc::Rc;
 use std::convert::TryInto;
@@ -32,7 +32,7 @@ use std::convert::TryInto;
 use futures::Stream;
 use tokio_core::reactor::Core;
 use tokio_zmq::prelude::*;
-use tokio_zmq::{Socket, Rep, Error};
+use tokio_zmq::{Error, Rep, Socket};
 
 fn main() {
     env_logger::init().unwrap();

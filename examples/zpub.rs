@@ -21,8 +21,8 @@
 
 extern crate futures;
 extern crate tokio_core;
-extern crate zmq;
 extern crate tokio_zmq;
+extern crate zmq;
 
 use std::io;
 use std::rc::Rc;
@@ -75,9 +75,7 @@ fn main() {
             println!("Sending 'Hello'");
             zmq::Message::from_slice(b"Hello")
                 .map_err(Error::from)
-                .map(|msg| {
-                    msg.into()
-                })
+                .map(|msg| msg.into())
         })
         .forward(zpub.sink::<Error>());
 

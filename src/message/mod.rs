@@ -156,9 +156,7 @@ impl From<zmq::Message> for Multipart {
 
 impl From<Vec<zmq::Message>> for Multipart {
     fn from(v: Vec<zmq::Message>) -> Self {
-        Multipart {
-            inner: v.into(),
-        }
+        Multipart { inner: v.into() }
     }
 }
 

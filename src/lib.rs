@@ -99,14 +99,14 @@
 //! # }
 //! ```
 
-extern crate zmq;
 extern crate futures;
+#[macro_use]
+extern crate log;
 extern crate tokio_core;
 extern crate tokio_file_unix;
 #[macro_use]
-extern crate log;
-#[macro_use]
 extern crate tokio_zmq_derive;
+extern crate zmq;
 
 mod error;
 mod message;
@@ -118,4 +118,4 @@ pub mod prelude;
 pub use self::error::Error;
 pub use self::message::Multipart;
 pub use self::socket::Socket;
-pub use self::socket::types::{Dealer, Rep, Req, Router, Pub, Sub, Push, Pull, Xpub, Xsub, Pair};
+pub use self::socket::types::{Dealer, Pair, Pub, Pull, Push, Rep, Req, Router, Sub, Xpub, Xsub};

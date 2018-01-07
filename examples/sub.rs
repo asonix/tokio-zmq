@@ -21,8 +21,8 @@
 
 extern crate futures;
 extern crate tokio_core;
-extern crate zmq;
 extern crate tokio_zmq;
+extern crate zmq;
 
 use std::rc::Rc;
 use std::convert::TryInto;

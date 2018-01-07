@@ -21,8 +21,8 @@
 
 extern crate futures;
 extern crate tokio_core;
-extern crate zmq;
 extern crate tokio_zmq;
+extern crate zmq;
 
 use std::rc::Rc;
 use std::convert::TryInto;
@@ -69,9 +69,7 @@ fn main() {
                 if msg == "STOP" {
                     handle.spawn(
                         send_cmd
-                            .send(
-                                zmq::Message::from_slice(b"").unwrap().into()
-                            )
+                            .send(zmq::Message::from_slice(b"").unwrap().into())
                             .map_err(|_| ()),
                     );
                 }

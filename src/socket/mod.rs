@@ -30,8 +30,7 @@ use tokio_file_unix::File;
 
 use prelude::*;
 use self::config::SocketBuilder;
-use async::{ControlledStream, MultipartRequest, MultipartResponse, MultipartSink,
-            MultipartStream};
+use async::{ControlledStream, MultipartRequest, MultipartResponse, MultipartSink, MultipartStream};
 use message::Multipart;
 use error::Error;
 use file::ZmqFile;
