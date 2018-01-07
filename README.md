@@ -69,7 +69,8 @@ The `zpub.rs` and `sub.rs` examples should be used togheter. `zpub` produces val
 
 The `push.rs`, `pull_push.rs`, and `pull.rs` files should be used together. `push` produces values, which are relayed by `pull_push` to `pull`, which consumes them and sends a stop signal to itself and to `pull_push`.
 
-`sync_pubsub.rs` and `dealer_router.rs` are each self-contained, and spawn multiple threads.
+`sync_pubsub.rs`, `dealer_router.rs`, and `load_balancing_broker` are all self-contained, and spawn multiple threads.
+
 
 ### Contributing
 Feel free to open issues for anything you find an issue with. Please note that any contributed code will be licensed under the GPLv3.
