@@ -28,7 +28,6 @@ extern crate env_logger;
 
 use std::rc::Rc;
 use std::convert::TryInto;
-use std::collections::VecDeque;
 use std::thread;
 use std::time::Duration;
 
@@ -37,7 +36,7 @@ use futures::{Future, Stream};
 use tokio_core::reactor::Core;
 use tokio_zmq::prelude::*;
 use tokio_zmq::{Rep, Req, Pub, Sub};
-use tokio_zmq::{Socket, Error};
+use tokio_zmq::{Socket, Multipart, Error};
 
 // On my quad-core i7, if I run with too many threads, the context switching takes too long and
 // some messages get dropped. 2 subscribers can properly retrieve 1 million messages each, though.
@@ -49,7 +48,7 @@ const MESSAGES: usize = 1_000;
 struct Stop;
 
 impl EndHandler for Stop {
-    fn should_stop(&mut self, item: &VecDeque<zmq::Message>) -> bool {
+    fn should_stop(&mut self, item: &Multipart) -> bool {
         if let Some(msg) = item.get(0) {
             if let Some(msg) = msg.as_str() {
                 if msg == "END" {
@@ -82,10 +81,7 @@ fn publisher_thread() {
     let runner = iter_ok(0..SUBSCRIBERS)
         .zip(syncservice.stream())
         .map(|(_, _)| {
-            let msg = zmq::Message::from_slice(b"").unwrap();
-            let mut multipart = VecDeque::new();
-            multipart.push_back(msg);
-            multipart
+            zmq::Message::from_slice(b"").unwrap().into()
         })
         .forward(syncservice.sink::<Error>())
         .and_then(|_| {
@@ -93,21 +89,14 @@ fn publisher_thread() {
 
             iter_ok(0..MESSAGES)
                 .map(|_| {
-                    let msg = zmq::Message::from_slice(b"Rhubarb").unwrap();
-
-                    let mut multipart = VecDeque::new();
-                    multipart.push_back(msg);
-                    multipart
+                    zmq::Message::from_slice(b"Rhubarb").unwrap().into()
                 })
                 .forward(publisher.sink::<Error>())
         })
         .and_then(|_| {
             let msg = zmq::Message::from_slice(b"END").unwrap();
 
-            let mut multipart = VecDeque::new();
-            multipart.push_back(msg);
-
-            publisher.send(multipart)
+            publisher.send(msg.into())
         });
 
     core.run(runner).unwrap();
@@ -130,13 +119,11 @@ fn subscriber_thread() {
         .unwrap();
 
     let msg = zmq::Message::from_slice(b"").unwrap();
-    let mut multipart = VecDeque::new();
-    multipart.push_back(msg);
 
     let recv = syncclient.recv();
 
     let runner = syncclient
-        .send(multipart)
+        .send(msg.into())
         .and_then(move |_| recv)
         .and_then(|_| {
             subscriber

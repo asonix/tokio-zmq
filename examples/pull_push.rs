@@ -26,18 +26,17 @@ extern crate tokio_zmq;
 
 use std::rc::Rc;
 use std::convert::TryInto;
-use std::collections::VecDeque;
 
 use futures::Stream;
 use tokio_core::reactor::Core;
 use tokio_zmq::prelude::*;
 use tokio_zmq::{Pull, Push, Sub};
-use tokio_zmq::{Error as ZmqFutError, Socket};
+use tokio_zmq::{Error as ZmqFutError, Multipart, Socket};
 
 pub struct Stop;
 
 impl ControlHandler for Stop {
-    fn should_stop(&mut self, _: VecDeque<zmq::Message>) -> bool {
+    fn should_stop(&mut self, _: Multipart) -> bool {
         println!("Got stop signal");
         true
     }

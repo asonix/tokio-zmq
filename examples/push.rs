@@ -28,7 +28,6 @@ use std::io;
 use std::rc::Rc;
 use std::time::Duration;
 use std::convert::TryInto;
-use std::collections::VecDeque;
 
 use futures::{Future, Stream};
 use futures::stream::iter_ok;
@@ -74,22 +73,8 @@ fn main() {
         .try_into()
         .unwrap();
 
-    let start_msg = {
-        let msg = zmq::Message::from_slice(b"START").unwrap();
-
-        let mut multipart = VecDeque::new();
-        multipart.push_back(msg);
-
-        multipart
-    };
-    let stop_msg = {
-        let msg = zmq::Message::from_slice(b"STOP").unwrap();
-
-        let mut multipart = VecDeque::new();
-        multipart.push_back(msg);
-
-        multipart
-    };
+    let start_msg = zmq::Message::from_slice(b"START").unwrap().into();
+    let stop_msg = zmq::Message::from_slice(b"STOP").unwrap().into();
 
     let interval = Interval::new(Duration::from_millis(200), &core.handle()).unwrap();
 
@@ -104,10 +89,7 @@ fn main() {
                 let msg = msg.as_bytes();
                 let msg = zmq::Message::from_slice(msg)?;
 
-                let mut multipart = VecDeque::new();
-                multipart.push_back(msg);
-
-                Ok(multipart)
+                Ok(msg.into())
             })
             .forward(workers.sink::<Error>())
             .and_then(move |_| sink.send(stop_msg).map_err(Error::from))

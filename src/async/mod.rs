@@ -26,83 +26,9 @@ pub mod future;
 pub mod sink;
 pub mod stream;
 
-use std::collections::VecDeque;
-
-use zmq;
-
 pub use self::future::{MultipartRequest, MultipartResponse};
 pub use self::sink::MultipartSink;
 pub use self::stream::{ControlledStream, MultipartStream};
-
-/// This type is used for receiving and sending messages in Multipart groups. An application could
-/// make using this easier by implementing traits as follows:
-///
-/// ```rust
-/// #![feature(try_from)]
-///
-/// extern crate zmq;
-/// extern crate tokio_zmq;
-///
-/// use std::convert::{TryFrom, TryInto};
-/// use std::collections::VecDeque;
-///
-/// use tokio_zmq::async::Multipart;
-///
-/// #[derive(Debug)]
-/// enum Error {
-///     NotEnoughMessages,
-///     TooManyMessages,
-/// }
-///
-/// struct Envelope {
-///     filter: zmq::Message,
-///     address: zmq::Message,
-///     body: zmq::Message,
-/// }
-///
-/// impl TryFrom<Multipart> for Envelope {
-///     type Error = Error;
-///
-///     fn try_from(mut multipart: Multipart) -> Result<Self, Self::Error> {
-///         let filter = multipart.pop_front().ok_or(Error::NotEnoughMessages)?;
-///         let address = multipart.pop_front().ok_or(Error::NotEnoughMessages)?;
-///         let body = multipart.pop_front().ok_or(Error::NotEnoughMessages)?;
-///
-///         if !multipart.is_empty() {
-///             return Err(Error::TooManyMessages);
-///         }
-///
-///         Ok(Envelope {
-///             filter,
-///             address,
-///             body,
-///         })
-///     }
-/// }
-///
-/// impl From<Envelope> for Multipart {
-///     fn from(envelope: Envelope) -> Self {
-///         let mut multipart = VecDeque::new();
-///
-///         multipart.push_back(envelope.filter);
-///         multipart.push_back(envelope.address);
-///         multipart.push_back(envelope.body);
-///
-///         multipart
-///     }
-/// }
-///
-/// fn main() {
-///     let mut multipart: Multipart = VecDeque::new();
-///     multipart.push_back(zmq::Message::from_slice(b"FILTER: asdf").unwrap());
-///     multipart.push_back(zmq::Message::from_slice(b"some.address").unwrap());
-///     multipart.push_back(zmq::Message::from_slice(b"Some content").unwrap());
-///     let envelope: Envelope = multipart.try_into().unwrap();
-///
-///     let multipart2: Multipart = envelope.into();
-/// }
-/// ```
-pub type Multipart = VecDeque<zmq::Message>;
 
 /// This type is used to determine what flags should be used when sending messages. If a message is
 /// the last in it's `Multipart`, it should not have the SNDMORE flag set.

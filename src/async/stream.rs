@@ -27,7 +27,7 @@ use futures::{Async, Future, Poll, Stream};
 use prelude::{ControlHandler, DefaultEndHandler, EndHandler};
 use async::future::MultipartResponse;
 use error::Error;
-use super::Multipart;
+use message::Multipart;
 use file::ZmqFile;
 
 /// The `MultipartStream` Sink handles receiving streams of data from ZeroMQ Sockets.

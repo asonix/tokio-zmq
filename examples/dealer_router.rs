@@ -28,7 +28,6 @@ extern crate env_logger;
 
 use std::rc::Rc;
 use std::convert::TryInto;
-use std::collections::VecDeque;
 use std::thread;
 use std::env;
 
@@ -37,12 +36,12 @@ use futures::{Future, Stream};
 use tokio_core::reactor::Core;
 use tokio_zmq::prelude::*;
 use tokio_zmq::{Dealer, Rep, Req, Router, Pub, Sub};
-use tokio_zmq::{Socket, Error};
+use tokio_zmq::{Socket, Multipart, Error};
 
 pub struct Stop;
 
 impl ControlHandler for Stop {
-    fn should_stop(&mut self, _: VecDeque<zmq::Message>) -> bool {
+    fn should_stop(&mut self, _: Multipart) -> bool {
         println!("Got stop signal");
         true
     }
@@ -66,13 +65,10 @@ fn client() {
         .and_then(|request_nbr| {
             let msg = zmq::Message::from_slice(b"Hewwo?").unwrap();
 
-            let mut multipart = VecDeque::new();
-            multipart.push_back(msg);
-
             println!("Sending 'Hewwo?' for {}", request_nbr);
 
             let response = req.recv();
-            let request = req.send(multipart);
+            let request = req.send(msg.into());
 
             request.and_then(move |_| {
                 response.map(move |multipart| (request_nbr, multipart))
@@ -90,10 +86,7 @@ fn client() {
         .and_then(|_| {
             let msg = zmq::Message::from_slice(b"").unwrap();
 
-            let mut multipart = VecDeque::new();
-            multipart.push_back(msg);
-
-            zpub.send(multipart)
+            zpub.send(msg.into())
         });
 
     let res = core.run(runner);
@@ -129,10 +122,8 @@ fn worker() {
             }
 
             let msg = zmq::Message::from_slice(b"Mr Obama???").unwrap();
-            let mut multipart = VecDeque::new();
-            multipart.push_back(msg);
 
-            multipart
+            msg.into()
         })
         .forward(rep.sink::<Error>());
 

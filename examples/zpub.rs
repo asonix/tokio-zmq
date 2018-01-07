@@ -28,7 +28,6 @@ use std::io;
 use std::rc::Rc;
 use std::time::Duration;
 use std::convert::TryInto;
-use std::collections::VecDeque;
 
 use futures::Stream;
 use tokio_core::reactor::{Core, Interval};
@@ -77,9 +76,7 @@ fn main() {
             zmq::Message::from_slice(b"Hello")
                 .map_err(Error::from)
                 .map(|msg| {
-                    let mut multipart = VecDeque::new();
-                    multipart.push_back(msg);
-                    multipart
+                    msg.into()
                 })
         })
         .forward(zpub.sink::<Error>());

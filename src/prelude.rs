@@ -20,8 +20,9 @@
 //! Provide useful types and traits for working with Tokio ZMQ.
 
 use socket::{ControlledSocket, Socket};
-use async::{ControlledStream, Multipart, MultipartRequest, MultipartResponse, MultipartSink,
+use async::{ControlledStream, MultipartRequest, MultipartResponse, MultipartSink,
             MultipartStream};
+use message::Multipart;
 use error::Error;
 
 /* ----------------------------------TYPES----------------------------------- */

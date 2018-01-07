@@ -29,7 +29,8 @@ use futures::{Async, AsyncSink, Future, Poll};
 use futures::task;
 
 use error::Error;
-use super::{MsgPlace, Multipart};
+use super::{MsgPlace};
+use message::Multipart;
 use file::ZmqFile;
 
 /// The `MultipartRequest` Future handles asynchronously sending data to a socket.

@@ -28,7 +28,7 @@ use tokio_core::reactor::PollEvented;
 use tokio_file_unix::File;
 use futures::{Async, AsyncSink, Future, Poll, Sink, StartSend};
 
-use super::Multipart;
+use message::Multipart;
 use async::future::MultipartRequest;
 use error::Error;
 use file::ZmqFile;

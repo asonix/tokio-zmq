@@ -28,13 +28,12 @@ extern crate env_logger;
 
 use std::rc::Rc;
 use std::convert::TryInto;
-use std::collections::VecDeque;
 
 use futures::{Future, Stream};
 use futures::stream::iter_ok;
 use tokio_core::reactor::Core;
 use tokio_zmq::prelude::*;
-use tokio_zmq::{Socket, Req};
+use tokio_zmq::{Multipart, Socket, Req};
 
 fn main() {
     env_logger::init().unwrap();
@@ -49,7 +48,8 @@ fn main() {
 
     let runner = iter_ok(0..10_000)
         .and_then(|i| {
-            let mut multipart = VecDeque::new();
+            let mut multipart = Multipart::new();
+
             let msg1 = zmq::Message::from_slice(format!("Hewwo? {}", i).as_bytes()).unwrap();
             let msg2 = zmq::Message::from_slice(format!("Mr Obama??? {}", i).as_bytes()).unwrap();
 

@@ -109,11 +109,13 @@ extern crate log;
 extern crate tokio_zmq_derive;
 
 mod error;
+mod message;
 pub mod async;
 pub mod socket;
 pub mod file;
 pub mod prelude;
 
 pub use self::error::Error;
+pub use self::message::Multipart;
 pub use self::socket::Socket;
 pub use self::socket::types::{Dealer, Rep, Req, Router, Pub, Sub, Push, Pull, Xpub, Xsub, Pair};
