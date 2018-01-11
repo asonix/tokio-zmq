@@ -300,7 +300,7 @@ where
 
 impl<S> TimeoutStream<S>
 where
-    S: Stream,
+    S: Stream<Error = Error>,
 {
     /// Add a timeout to a stream
     pub fn new(stream: S, duration: Duration) -> Self {
