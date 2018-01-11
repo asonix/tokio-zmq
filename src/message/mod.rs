@@ -17,7 +17,7 @@
  * along with Tokio ZMQ.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-//! This module contains the Multipart type, which is a wrapper around a VecDeque. The Multipart
+//! This module contains the Multipart type, which is a wrapper around a `VecDeque`. The Multipart
 //! type implements `From<zmq::Message>` for easy creation.
 
 use std::collections::VecDeque;

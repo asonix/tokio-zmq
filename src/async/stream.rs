@@ -138,6 +138,7 @@ impl Stream for MultipartStream {
     }
 }
 
+/// A stream that ends when the `EndHandler`'s `should_stop` method returns True
 pub struct EndingStream<E, S>
 where
     E: EndHandler,
@@ -324,13 +325,10 @@ where
     type Error = Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        match self.timeout.poll()? {
-            Async::Ready(_) => {
-                self.timeout = self.timer.sleep(self.duration);
+        if let Async::Ready(_) = self.timeout.poll()? {
+            self.timeout = self.timer.sleep(self.duration);
 
-                return Ok(Async::Ready(Some(Either::B(Timeout))));
-            }
-            _ => (),
+            return Ok(Async::Ready(Some(Either::B(Timeout))));
         }
 
         let res = match self.stream.poll()? {

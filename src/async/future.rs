@@ -95,14 +95,7 @@ impl MultipartRequest {
     }
 
     fn send(&mut self) -> Poll<(), Error> {
-        loop {
-            let mut multipart = match self.multipart.take() {
-                Some(multipart) => multipart,
-                None => {
-                    break;
-                }
-            };
-
+        while let Some(mut multipart) = self.multipart.take() {
             let msg = match multipart.pop_front() {
                 Some(msg) => msg,
                 None => {

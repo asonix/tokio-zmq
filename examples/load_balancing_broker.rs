@@ -323,7 +323,10 @@ enum UseBroker {
 fn main() {
     env_logger::init().unwrap();
 
-    let use_broker = match env::var("USE_BROKER").unwrap_or("all".to_owned()).as_str() {
+    let use_broker = match env::var("USE_BROKER")
+        .unwrap_or_else(|_| "all".to_owned())
+        .as_str()
+    {
         "yes" => UseBroker::Yes,
         "no" => UseBroker::No,
         _ => UseBroker::All,
