@@ -46,38 +46,39 @@ fn main() {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
     let ctx = Rc::new(zmq::Context::new());
-    let cmd: Sub = Socket::create(Rc::clone(&ctx), &handle)
+    let cmd: Sub = Socket::builder(Rc::clone(&ctx), &handle)
         .connect("tcp://localhost:5559")
         .filter(b"")
         .try_into()
         .unwrap();
-    let conn: Pull = Socket::create(Rc::clone(&ctx), &handle)
+    let conn: Pull = Socket::builder(Rc::clone(&ctx), &handle)
         .bind("tcp://*:5558")
         .try_into()
         .unwrap();
-    let conn = conn.controlled(cmd);
-    let send_cmd: Pub = Socket::create(ctx, &handle)
+    let send_cmd: Pub = Socket::builder(ctx, &handle)
         .bind("tcp://*:5559")
         .try_into()
         .unwrap();
 
-    let process = conn.stream(Stop).for_each(move |multipart| {
-        for msg in multipart {
-            if let Some(msg) = msg.as_str() {
-                println!("msg: '{}'", msg);
+    let process = conn.stream()
+        .controlled(cmd, Stop)
+        .for_each(move |multipart| {
+            for msg in multipart {
+                if let Some(msg) = msg.as_str() {
+                    println!("msg: '{}'", msg);
 
-                if msg == "STOP" {
-                    handle.spawn(
-                        send_cmd
-                            .send(zmq::Message::from_slice(b"").unwrap().into())
-                            .map_err(|_| ()),
-                    );
+                    if msg == "STOP" {
+                        handle.spawn(
+                            send_cmd
+                                .send(zmq::Message::from_slice(b"").unwrap().into())
+                                .map_err(|_| ()),
+                        );
+                    }
                 }
             }
-        }
 
-        Ok(())
-    });
+            Ok(())
+        });
 
     core.run(process).unwrap();
 }

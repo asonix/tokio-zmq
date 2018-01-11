@@ -53,12 +53,12 @@ fn client() {
     let mut core = Core::new().unwrap();
     let ctx = Rc::new(zmq::Context::new());
     let handle = core.handle();
-    let req: Req = Socket::create(Rc::clone(&ctx), &handle)
+    let req: Req = Socket::builder(Rc::clone(&ctx), &handle)
         .connect("tcp://localhost:5559")
         .try_into()
         .unwrap();
 
-    let zpub: Pub = Socket::create(Rc::clone(&ctx), &handle)
+    let zpub: Pub = Socket::builder(Rc::clone(&ctx), &handle)
         .bind("tcp://*:5561")
         .try_into()
         .unwrap();
@@ -100,20 +100,19 @@ fn worker() {
     let handle = core.handle();
     let ctx = Rc::new(zmq::Context::new());
 
-    let rep: Rep = Socket::create(Rc::clone(&ctx), &handle)
+    let rep: Rep = Socket::builder(Rc::clone(&ctx), &handle)
         .connect("tcp://localhost:5560")
         .try_into()
         .unwrap();
 
-    let sub: Sub = Socket::create(Rc::clone(&ctx), &handle)
+    let cmd: Sub = Socket::builder(Rc::clone(&ctx), &handle)
         .connect("tcp://localhost:5561")
         .filter(b"")
         .try_into()
         .unwrap();
 
-    let rep = rep.controlled(sub);
-
-    let runner = rep.stream(Stop)
+    let runner = rep.stream()
+        .controlled(cmd, Stop)
         .map(|multipart| {
             for msg in multipart {
                 if let Some(msg) = msg.as_str() {
@@ -139,30 +138,30 @@ fn broker() {
     let handle = core.handle();
     let ctx = Rc::new(zmq::Context::new());
 
-    let router: Router = Socket::create(Rc::clone(&ctx), &handle)
+    let router: Router = Socket::builder(Rc::clone(&ctx), &handle)
         .bind("tcp://*:5559")
         .try_into()
         .unwrap();
-    let sub: Sub = Socket::create(Rc::clone(&ctx), &handle)
-        .connect("tcp://localhost:5561")
-        .filter(b"")
-        .try_into()
-        .unwrap();
-    let router = router.controlled(sub);
 
-    let dealer: Dealer = Socket::create(Rc::clone(&ctx), &handle)
+    let dealer: Dealer = Socket::builder(Rc::clone(&ctx), &handle)
         .bind("tcp://*:5560")
         .try_into()
         .unwrap();
-    let sub: Sub = Socket::create(Rc::clone(&ctx), &handle)
+
+    let cmd1: Sub = Socket::builder(Rc::clone(&ctx), &handle)
         .connect("tcp://localhost:5561")
         .filter(b"")
         .try_into()
         .unwrap();
-    let dealer = dealer.controlled(sub);
+    let cmd2: Sub = Socket::builder(Rc::clone(&ctx), &handle)
+        .connect("tcp://localhost:5561")
+        .filter(b"")
+        .try_into()
+        .unwrap();
 
     let d2r = dealer
-        .stream(Stop)
+        .stream()
+        .controlled(cmd1, Stop)
         .map(|multipart| {
             for msg in &multipart {
                 if let Some(msg) = msg.as_str() {
@@ -174,8 +173,10 @@ fn broker() {
             multipart
         })
         .forward(router.sink::<Error>());
+
     let r2d = router
-        .stream(Stop)
+        .stream()
+        .controlled(cmd2, Stop)
         .map(|multipart| {
             for msg in &multipart {
                 if let Some(msg) = msg.as_str() {

@@ -28,7 +28,7 @@ pub mod stream;
 
 pub use self::future::{MultipartRequest, MultipartResponse};
 pub use self::sink::MultipartSink;
-pub use self::stream::{ControlledStream, MultipartStream};
+pub use self::stream::{ControlledStream, EndingStream, MultipartStream, TimeoutStream};
 
 /// This type is used to determine what flags should be used when sending messages. If a message is
 /// the last in it's `Multipart`, it should not have the SNDMORE flag set.

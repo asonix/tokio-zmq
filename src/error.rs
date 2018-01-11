@@ -19,6 +19,7 @@
 
 use std::io::Error as IoError;
 use zmq::Error as ZmqError;
+use tokio_timer::TimerError;
 
 /// Defines the error type for Tokio ZMQ.
 ///
@@ -31,6 +32,8 @@ pub enum Error {
     Zmq(ZmqError),
     /// Stores PollEvented and File creation errors
     Io(IoError),
+    /// Stores Tokio Timer errors
+    Timer(TimerError),
 }
 
 impl From<ZmqError> for Error {
@@ -42,5 +45,11 @@ impl From<ZmqError> for Error {
 impl From<IoError> for Error {
     fn from(e: IoError) -> Self {
         Error::Io(e)
+    }
+}
+
+impl From<TimerError> for Error {
+    fn from(e: TimerError) -> Self {
+        Error::Timer(e)
     }
 }

@@ -24,7 +24,7 @@ use std::convert::TryFrom;
 use zmq;
 
 use socket::config::{PairConfig, SockConfig, SubConfig};
-use socket::{ControlledSocket, Socket};
+use socket::Socket;
 use error::Error;
 
 /* -------------------------------------------------------------------------- */
@@ -35,16 +35,8 @@ use error::Error;
 #[derive(Clone, SocketWrapper)]
 #[stream]
 #[sink]
-#[controlled = "DealerControlled"]
 pub struct Dealer {
     inner: Socket,
-}
-
-/// The controlled variant of Dealer
-#[derive(Clone, ControlledSocketWrapper)]
-#[sink]
-pub struct DealerControlled {
-    inner: ControlledSocket,
 }
 
 /* -------------------------------------------------------------------------- */
@@ -55,17 +47,9 @@ pub struct DealerControlled {
 #[derive(Clone, SocketWrapper)]
 #[stream]
 #[sink]
-#[controlled = "PairControlled"]
 #[try_from = "PairConfig"]
 pub struct Pair {
     inner: Socket,
-}
-
-/// The controlled variant of Pair
-#[derive(Clone, ControlledSocketWrapper)]
-#[sink]
-pub struct PairControlled {
-    inner: ControlledSocket,
 }
 
 /* -------------------------------------------------------------------------- */
@@ -86,15 +70,8 @@ pub struct Pub {
 /// Pull implements `StreamSocket`, and has an associated controlled variant.
 #[derive(Clone, SocketWrapper)]
 #[stream]
-#[controlled = "PullControlled"]
 pub struct Pull {
     inner: Socket,
-}
-
-/// The controlled variant of Pull
-#[derive(Clone, ControlledSocketWrapper)]
-pub struct PullControlled {
-    inner: ControlledSocket,
 }
 
 /* -------------------------------------------------------------------------- */
@@ -116,16 +93,8 @@ pub struct Push {
 #[derive(Clone, SocketWrapper)]
 #[stream]
 #[sink]
-#[controlled = "RepControlled"]
 pub struct Rep {
     inner: Socket,
-}
-
-/// The controlled variant of Rep
-#[derive(Clone, ControlledSocketWrapper)]
-#[sink]
-pub struct RepControlled {
-    inner: ControlledSocket,
 }
 
 /* -------------------------------------------------------------------------- */
@@ -136,16 +105,8 @@ pub struct RepControlled {
 #[derive(Clone, SocketWrapper)]
 #[stream]
 #[sink]
-#[controlled = "ReqControlled"]
 pub struct Req {
     inner: Socket,
-}
-
-/// The controlled variant of Req
-#[derive(Clone, ControlledSocketWrapper)]
-#[sink]
-pub struct ReqControlled {
-    inner: ControlledSocket,
 }
 
 /* -------------------------------------------------------------------------- */
@@ -156,16 +117,8 @@ pub struct ReqControlled {
 #[derive(Clone, SocketWrapper)]
 #[stream]
 #[sink]
-#[controlled = "RouterControlled"]
 pub struct Router {
     inner: Socket,
-}
-
-/// The controlled variant of Router
-#[derive(Clone, ControlledSocketWrapper)]
-#[sink]
-pub struct RouterControlled {
-    inner: ControlledSocket,
 }
 
 /* -------------------------------------------------------------------------- */
@@ -175,16 +128,9 @@ pub struct RouterControlled {
 /// Sub implements `StreamSocket`, and has an associated controlled variant.
 #[derive(Clone, SocketWrapper)]
 #[stream]
-#[controlled = "SubControlled"]
 #[try_from = "SubConfig"]
 pub struct Sub {
     inner: Socket,
-}
-
-/// The controlled variant of Sub.
-#[derive(Clone, ControlledSocketWrapper)]
-pub struct SubControlled {
-    inner: ControlledSocket,
 }
 
 /* -------------------------------------------------------------------------- */
@@ -195,16 +141,8 @@ pub struct SubControlled {
 #[derive(Clone, SocketWrapper)]
 #[stream]
 #[sink]
-#[controlled = "XpubControlled"]
 pub struct Xpub {
     inner: Socket,
-}
-
-/// The controlled variant of Xpub
-#[derive(Clone, ControlledSocketWrapper)]
-#[sink]
-pub struct XpubControlled {
-    inner: ControlledSocket,
 }
 
 /* -------------------------------------------------------------------------- */
@@ -215,14 +153,6 @@ pub struct XpubControlled {
 #[derive(Clone, SocketWrapper)]
 #[stream]
 #[sink]
-#[controlled = "XsubControlled"]
 pub struct Xsub {
     inner: Socket,
-}
-
-/// The controlled variant of Xsub
-#[derive(Clone, ControlledSocketWrapper)]
-#[sink]
-pub struct XsubControlled {
-    inner: ControlledSocket,
 }

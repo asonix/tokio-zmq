@@ -61,7 +61,7 @@ use file::ZmqFile;
 /// # fn get_sock() -> impl Future<Item = (), Error = Error> {
 /// #     let core = Core::new().unwrap();
 /// #     let ctx = Rc::new(zmq::Context::new());
-/// #     let rep: Rep = Socket::create(ctx, &core.handle())
+/// #     let rep: Rep = Socket::builder(ctx, &core.handle())
 /// #         .bind("tcp://*:5567")
 /// #         .try_into()
 /// #         .unwrap();
@@ -227,7 +227,7 @@ impl Future for MultipartRequest {
 /// # fn get_sock() -> impl Future<Item = Multipart, Error = Error> {
 /// #     let core = Core::new().unwrap();
 /// #     let ctx = Rc::new(zmq::Context::new());
-/// #     let rep: Rep = Socket::create(ctx, &core.handle())
+/// #     let rep: Rep = Socket::builder(ctx, &core.handle())
 /// #         .bind("tcp://*:5567")
 /// #         .try_into()
 /// #         .unwrap();

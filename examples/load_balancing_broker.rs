@@ -141,7 +141,7 @@ fn client_task(client_num: usize) -> usize {
     let mut core = Core::new().unwrap();
     let context = Rc::new(zmq::Context::new());
 
-    let client: Req = Socket::create(context, &core.handle())
+    let client: Req = Socket::builder(context, &core.handle())
         .identity(format!("c{}", client_num).as_bytes())
         .connect("tcp://localhost:5672")
         .try_into()
@@ -170,23 +170,23 @@ fn worker_task(worker_num: usize) -> usize {
     let handle = core.handle();
     let context = Rc::new(zmq::Context::new());
 
-    let control: Sub = Socket::create(Rc::clone(&context), &handle)
+    let control: Sub = Socket::builder(Rc::clone(&context), &handle)
         .connect("tcp://localhost:5674")
         .filter(b"")
         .try_into()
         .unwrap();
-    let worker: Req = Socket::create(context, &handle)
+    let worker: Req = Socket::builder(context, &handle)
         .identity(format!("w{}", worker_num).as_bytes())
         .connect("tcp://localhost:5673")
         .try_into()
         .unwrap();
-    let worker = worker.controlled(control);
 
     let msg = zmq::Message::from_slice(b"READY").unwrap();
     let fut = worker.send(msg.into()).map_err(Error::from);
 
     let inner_fut = worker
-        .stream(Stop)
+        .stream()
+        .controlled(control, Stop)
         .map_err(Error::from)
         .and_then(|multipart| {
             let mut envelope: Envelope = multipart.try_into()?;
@@ -216,26 +216,27 @@ fn broker_task() {
     let handle = core.handle();
     let context = Rc::new(zmq::Context::new());
 
-    let frontend: Router = Socket::create(Rc::clone(&context), &handle)
+    let frontend: Router = Socket::builder(Rc::clone(&context), &handle)
         .bind("tcp://*:5672")
         .try_into()
         .unwrap();
 
-    let control: Sub = Socket::create(Rc::clone(&context), &handle)
+    let control: Sub = Socket::builder(Rc::clone(&context), &handle)
         .connect("tcp://localhost:5674")
         .filter(b"")
         .try_into()
         .unwrap();
-    let backend: Router = Socket::create(context, &handle)
+
+    let backend: Router = Socket::builder(context, &handle)
         .bind("tcp://*:5673")
         .try_into()
         .unwrap();
-    let backend = backend.controlled(control);
 
     let (worker_send, worker_recv) = mpsc::channel::<zmq::Message>(10);
 
     let back2front = backend
-        .stream(Stop)
+        .stream()
+        .controlled(control, Stop)
         .map_err(Error::from)
         .and_then(|mut multipart| {
             let worker_id = multipart.pop_front().ok_or(Error::NotEnoughMessages)?;
@@ -343,7 +344,7 @@ fn main() {
             // Set up control socket
             let mut core = Core::new().unwrap();
             let context = Rc::new(zmq::Context::new());
-            let control: Pub = Socket::create(context, &core.handle())
+            let control: Pub = Socket::builder(context, &core.handle())
                 .bind("tcp://*:5674")
                 .try_into()
                 .unwrap();

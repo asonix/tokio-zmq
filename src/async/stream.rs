@@ -18,17 +18,20 @@
  */
 
 use std::rc::Rc;
+use std::time::Duration;
 
-use zmq;
+use futures::{Async, Future, Poll, Stream};
+use futures::future::Either;
 use tokio_core::reactor::PollEvented;
 use tokio_file_unix::File;
-use futures::{Async, Future, Poll, Stream};
+use tokio_timer::{Sleep, Timer};
+use zmq;
 
-use prelude::{ControlHandler, DefaultEndHandler, EndHandler};
 use async::future::MultipartResponse;
 use error::Error;
-use message::Multipart;
 use file::ZmqFile;
+use message::Multipart;
+use prelude::{ControlHandler, EndHandler, StreamSocket};
 
 /// The `MultipartStream` Sink handles receiving streams of data from ZeroMQ Sockets.
 ///
@@ -61,7 +64,7 @@ use file::ZmqFile;
 /// fn main() {
 ///     let core = Core::new().unwrap();
 ///     let context = Rc::new(zmq::Context::new());
-///     let socket = Socket::create(context, &core.handle())
+///     let socket = Socket::builder(context, &core.handle())
 ///         .connect("tcp://localhost:5568")
 ///         .filter(b"")
 ///         .build(zmq::SUB)
@@ -69,59 +72,49 @@ use file::ZmqFile;
 ///     get_stream(socket);
 /// }
 /// ```
-pub struct MultipartStream<E>
-where
-    E: EndHandler,
-{
+pub struct MultipartStream {
     // To build a multipart
     response: Option<MultipartResponse>,
     // To read data
     sock: Rc<zmq::Socket>,
     // Handles notifications to/from the event loop
     file: Rc<PollEvented<File<ZmqFile>>>,
-    // To handle stopping
-    end_handler: Option<E>,
 }
 
-impl MultipartStream<DefaultEndHandler> {
+impl MultipartStream {
     pub fn new(sock: Rc<zmq::Socket>, file: Rc<PollEvented<File<ZmqFile>>>) -> Self {
         MultipartStream {
             response: None,
             sock: sock,
             file: file,
-            end_handler: None,
         }
     }
-}
 
-impl<E> MultipartStream<E>
-where
-    E: EndHandler,
-{
-    pub fn new_with_end(
-        sock: Rc<zmq::Socket>,
-        file: Rc<PollEvented<File<ZmqFile>>>,
-        end_handler: E,
-    ) -> Self {
-        MultipartStream {
-            response: None,
-            sock: sock,
-            file: file,
-            end_handler: Some(end_handler),
-        }
+    /// Add a timeout to this stream
+    pub fn timeout(self, duration: Duration) -> TimeoutStream<Self> {
+        TimeoutStream::new(self, duration)
+    }
+
+    /// Add an EndHandler to this stream
+    pub fn with_end<E>(self, end_handler: E) -> EndingStream<E, Self>
+    where
+        E: EndHandler,
+    {
+        EndingStream::new(self, end_handler)
+    }
+
+    /// Add a control stream to this stream
+    pub fn controlled<A, H>(self, control: A, handler: H) -> ControlledStream<H, Self>
+    where
+        A: StreamSocket,
+        H: ControlHandler,
+    {
+        ControlledStream::new(self, control, handler)
     }
 
     fn poll_response(&mut self, mut response: MultipartResponse) -> Poll<Option<Multipart>, Error> {
         match response.poll()? {
-            Async::Ready(item) => {
-                if let Some(ref mut end_handler) = self.end_handler {
-                    if end_handler.should_stop(&item) {
-                        return Ok(Async::Ready(None));
-                    }
-                }
-
-                Ok(Async::Ready(Some(item)))
-            }
+            Async::Ready(item) => Ok(Async::Ready(Some(item))),
             Async::NotReady => {
                 self.response = Some(response);
                 self.file.need_read();
@@ -131,10 +124,7 @@ where
     }
 }
 
-impl<E> Stream for MultipartStream<E>
-where
-    E: EndHandler,
-{
+impl Stream for MultipartStream {
     type Item = Multipart;
     type Error = Error;
 
@@ -148,74 +138,126 @@ where
     }
 }
 
+pub struct EndingStream<E, S>
+where
+    E: EndHandler,
+    S: Stream<Item = Multipart, Error = Error>,
+{
+    stream: S,
+    // To handle stopping
+    end_handler: E,
+}
+
+impl<E, S> EndingStream<E, S>
+where
+    E: EndHandler,
+    S: Stream<Item = Multipart, Error = Error>,
+{
+    /// Wrap a stream with an EndHandler
+    pub fn new(stream: S, end_handler: E) -> Self
+    where
+        E: EndHandler,
+    {
+        EndingStream {
+            stream,
+            end_handler,
+        }
+    }
+
+    /// Add a timeout to this stream
+    pub fn timeout(self, duration: Duration) -> TimeoutStream<Self> {
+        TimeoutStream::new(self, duration)
+    }
+
+    /// Add a control stream to this stream
+    pub fn controlled<A, H>(self, control: A, handler: H) -> ControlledStream<H, Self>
+    where
+        A: StreamSocket,
+        H: ControlHandler,
+    {
+        ControlledStream::new(self, control, handler)
+    }
+}
+
+impl<E, S> Stream for EndingStream<E, S>
+where
+    E: EndHandler,
+    S: Stream<Item = Multipart, Error = Error>,
+{
+    type Item = Multipart;
+    type Error = Error;
+
+    fn poll(&mut self) -> Poll<Option<Multipart>, Error> {
+        let res = match self.stream.poll()? {
+            Async::Ready(Some(item)) => if self.end_handler.should_stop(&item) {
+                Async::Ready(None)
+            } else {
+                Async::Ready(Some(item))
+            },
+            Async::Ready(None) => Async::Ready(None),
+            Async::NotReady => Async::NotReady,
+        };
+
+        Ok(res)
+    }
+}
+
 /// `ControlledStream`s are used when you want a stream of multiparts, but you want to be able to
 /// turn it off.
 ///
 /// It contains a handler that implements the `ControlHandler` trait. This trait contains a single
 /// method `should_stop`, that determines whether or not the given stream should stop producing
 /// values.
-pub struct ControlledStream<E, H>
+pub struct ControlledStream<H, S>
 where
-    E: EndHandler,
     H: ControlHandler,
+    S: Stream<Item = Multipart, Error = Error>,
 {
-    stream: MultipartStream<E>,
-    control: MultipartStream<DefaultEndHandler>,
+    stream: S,
+    control: MultipartStream,
     handler: H,
 }
 
-impl<H> ControlledStream<DefaultEndHandler, H>
+impl<H, S> ControlledStream<H, S>
 where
     H: ControlHandler,
+    S: Stream<Item = Multipart, Error = Error>,
 {
     /// Create a new ControlledStream.
     ///
     /// This shouldn't be called directly. A socket wrapper type's `controlled` method, if present,
     /// will perform the required actions to create and encapsulate this type.
-    pub fn new(
-        sock: Rc<zmq::Socket>,
-        file: Rc<PollEvented<File<ZmqFile>>>,
-        control_sock: Rc<zmq::Socket>,
-        control_file: Rc<PollEvented<File<ZmqFile>>>,
-        handler: H,
-    ) -> ControlledStream<DefaultEndHandler, H> {
+    pub fn new<A>(stream: S, control_sock: A, handler: H) -> ControlledStream<H, S>
+    where
+        A: StreamSocket,
+    {
+        let control = control_sock.into_socket().stream();
+
         ControlledStream {
-            stream: MultipartStream::new(sock, file),
-            control: MultipartStream::new(control_sock, control_file),
-            handler: handler,
+            stream,
+            control,
+            handler,
         }
+    }
+
+    /// Add a timeout to this stream
+    pub fn timeout(self, duration: Duration) -> TimeoutStream<Self> {
+        TimeoutStream::new(self, duration)
+    }
+
+    /// Add an EndHandler to this stream
+    pub fn with_end<E>(self, end_handler: E) -> EndingStream<E, Self>
+    where
+        E: EndHandler,
+    {
+        EndingStream::new(self, end_handler)
     }
 }
 
-impl<E, H> ControlledStream<E, H>
+impl<H, S> Stream for ControlledStream<H, S>
 where
-    E: EndHandler,
     H: ControlHandler,
-{
-    /// Create a new ControlledStream with an EndHandler as well
-    ///
-    /// This shouldn't be called directly. A socket wrapper type's `controlled_with_end` method, if
-    /// present, will performt he required actions to create and encpasulate this type.
-    pub fn new_with_end(
-        sock: Rc<zmq::Socket>,
-        file: Rc<PollEvented<File<ZmqFile>>>,
-        control_sock: Rc<zmq::Socket>,
-        control_file: Rc<PollEvented<File<ZmqFile>>>,
-        handler: H,
-        end_handler: E,
-    ) -> Self {
-        ControlledStream {
-            stream: MultipartStream::new_with_end(sock, file, end_handler),
-            control: MultipartStream::new(control_sock, control_file),
-            handler: handler,
-        }
-    }
-}
-
-impl<E, H> Stream for ControlledStream<E, H>
-where
-    E: EndHandler,
-    H: ControlHandler,
+    S: Stream<Item = Multipart, Error = Error>,
 {
     type Item = Multipart;
     type Error = Error;
@@ -223,8 +265,8 @@ where
     /// Poll the control stream, if it isn't ready, poll the producing stream
     ///
     /// If the control stream is ready, but has ended, stop the producting stream.
-    /// If the control stream is ready with a Multipart, use the `ControlHandler` to
-    /// determine if the producting stream should be stopped.
+    /// If the control stream is ready with a Multipart, use the `ControlHandler`
+    /// to determine if the producting stream should be stopped.
     fn poll(&mut self) -> Poll<Option<Multipart>, Error> {
         let stop = match self.control.poll()? {
             Async::NotReady => false,
@@ -237,5 +279,66 @@ where
         } else {
             self.stream.poll()
         }
+    }
+}
+
+/// An empty type to represent a timeout event
+pub struct Timeout;
+
+/// A stream that provides either an `Item` or a `Timeout`
+///
+/// This is different from `tokio_timer::TimeoutStream<T>`, since that stream errors on timeout.
+pub struct TimeoutStream<S>
+where
+    S: Stream,
+{
+    stream: S,
+    duration: Duration,
+    timer: Timer,
+    timeout: Sleep,
+}
+
+impl<S> TimeoutStream<S>
+where
+    S: Stream,
+{
+    /// Add a timeout to a stream
+    pub fn new(stream: S, duration: Duration) -> Self {
+        let timer = Timer::default();
+        let timeout = timer.sleep(duration);
+
+        TimeoutStream {
+            stream,
+            duration,
+            timer,
+            timeout,
+        }
+    }
+}
+
+impl<S> Stream for TimeoutStream<S>
+where
+    S: Stream<Error = Error>,
+{
+    type Item = Either<S::Item, Timeout>;
+    type Error = Error;
+
+    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+        match self.timeout.poll()? {
+            Async::Ready(_) => {
+                self.timeout = self.timer.sleep(self.duration);
+
+                return Ok(Async::Ready(Some(Either::B(Timeout))));
+            }
+            _ => (),
+        }
+
+        let res = match self.stream.poll()? {
+            Async::Ready(Some(item)) => Async::Ready(Some(Either::A(item))),
+            Async::Ready(None) => Async::Ready(None),
+            Async::NotReady => Async::NotReady,
+        };
+
+        Ok(res)
     }
 }

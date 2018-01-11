@@ -46,23 +46,23 @@ fn main() {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
     let ctx = Rc::new(zmq::Context::new());
-    let cmd: Sub = Socket::create(Rc::clone(&ctx), &handle)
+    let cmd: Sub = Socket::builder(Rc::clone(&ctx), &handle)
         .connect("tcp://localhost:5559")
         .filter(b"")
         .try_into()
         .unwrap();
-    let stream: Pull = Socket::create(Rc::clone(&ctx), &handle)
+    let stream: Pull = Socket::builder(Rc::clone(&ctx), &handle)
         .connect("tcp://localhost:5557")
         .try_into()
         .unwrap();
-    let stream = stream.controlled(cmd);
-    let sink: Push = Socket::create(ctx, &handle)
+    let sink: Push = Socket::builder(ctx, &handle)
         .connect("tcp://localhost:5558")
         .try_into()
         .unwrap();
 
     let runner = stream
-        .stream(Stop)
+        .stream()
+        .controlled(cmd, Stop)
         .map(|multipart| {
             for msg in &multipart {
                 if let Some(msg) = msg.as_str() {

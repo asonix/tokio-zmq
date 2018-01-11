@@ -66,11 +66,11 @@
 //!
 //!     // Create our two sockets using the Socket builder pattern.
 //!     // Note that the variable is named zpub, since pub is a keyword
-//!     let zpub: Pub = Socket::create(Rc::clone(&context), &handle)
+//!     let zpub: Pub = Socket::builder(Rc::clone(&context), &handle)
 //!         .bind("tcp://*:5561")
 //!         .try_into()?;
 //!
-//!     let sub: Sub = Socket::create(context, &handle)
+//!     let sub: Sub = Socket::builder(context, &handle)
 //!         .bind("tcp://*:5562")
 //!         .filter(b"")
 //!         .try_into()?;
@@ -104,6 +104,7 @@ extern crate futures;
 extern crate log;
 extern crate tokio_core;
 extern crate tokio_file_unix;
+extern crate tokio_timer;
 #[macro_use]
 extern crate tokio_zmq_derive;
 extern crate zmq;

@@ -28,9 +28,8 @@ use zmq;
 use tokio_core::reactor::{Handle, PollEvented};
 use tokio_file_unix::File;
 
-use prelude::*;
 use self::config::SocketBuilder;
-use async::{ControlledStream, MultipartRequest, MultipartResponse, MultipartSink, MultipartStream};
+use async::{MultipartRequest, MultipartResponse, MultipartSink, MultipartStream};
 use message::Multipart;
 use error::Error;
 use file::ZmqFile;
@@ -47,7 +46,7 @@ pub struct Socket {
 
 impl Socket {
     /// Start a new Socket Config builder
-    pub fn create(ctx: Rc<zmq::Context>, handle: &Handle) -> SocketBuilder {
+    pub fn builder(ctx: Rc<zmq::Context>, handle: &Handle) -> SocketBuilder {
         SocketBuilder::new(ctx, handle)
     }
 
@@ -69,20 +68,6 @@ impl Socket {
         Socket { sock, file }
     }
 
-    /// Create a ControlledSocket from this and a controller socket
-    ///
-    /// The resulting ControlledSocket receives it's main data from the current socket, and control
-    /// commands from the control socket.
-    pub fn controlled<S>(self, control: S) -> ControlledSocket
-    where
-        S: StreamSocket,
-    {
-        ControlledSocket {
-            stream_sock: self,
-            control_sock: control.into_socket(),
-        }
-    }
-
     /// Retrieve a Sink that consumes Multiparts, sending them to the socket
     pub fn sink<E>(&self) -> MultipartSink<E>
     where
@@ -92,16 +77,8 @@ impl Socket {
     }
 
     /// Retrieve a Stream that produces Multiparts, getting them from the socket
-    pub fn stream(&self) -> MultipartStream<DefaultEndHandler> {
+    pub fn stream(&self) -> MultipartStream {
         MultipartStream::new(Rc::clone(&self.sock), Rc::clone(&self.file))
-    }
-
-    /// Retrieve a stream that produces Multiparts. This stream has an end condition
-    pub fn stream_with_end<E>(&self, end_handler: E) -> MultipartStream<E>
-    where
-        E: EndHandler,
-    {
-        MultipartStream::new_with_end(Rc::clone(&self.sock), Rc::clone(&self.file), end_handler)
     }
 
     /// Retrieve a Future that consumes a multipart, sending it to the socket
@@ -112,67 +89,5 @@ impl Socket {
     /// Retrieve a Future that produces a multipart, getting it fromthe socket
     pub fn recv(&self) -> MultipartResponse {
         MultipartResponse::new(Rc::clone(&self.sock), Rc::clone(&self.file))
-    }
-}
-
-/// Defines a raw `ControlledSocket` type
-///
-/// Controlled sockets are useful for being able to stop streams. They shouldn't be created
-/// directly, but through a wrapper type's `controlled` method.
-#[derive(Clone)]
-pub struct ControlledSocket {
-    stream_sock: Socket,
-    control_sock: Socket,
-}
-
-impl ControlledSocket {
-    /// Retrieve a sink that consumes multiparts, sending them to the socket.
-    pub fn sink<E>(&self) -> MultipartSink<E>
-    where
-        E: From<Error>,
-    {
-        self.stream_sock.sink()
-    }
-
-    /// Retrieve a stream that produces multiparts, stopping when the should_stop control handler
-    /// returns true.
-    pub fn stream<H>(&self, handler: H) -> ControlledStream<DefaultEndHandler, H>
-    where
-        H: ControlHandler,
-    {
-        ControlledStream::new(
-            Rc::clone(&self.stream_sock.sock),
-            Rc::clone(&self.stream_sock.file),
-            Rc::clone(&self.control_sock.sock),
-            Rc::clone(&self.control_sock.file),
-            handler,
-        )
-    }
-
-    /// Retrieve a stream that produces multiparts, stopping when the should_stop control handler
-    /// returns true, or when the should_stop end_handler returns true.
-    pub fn stream_with_end<E, H>(&self, handler: H, end_handler: E) -> ControlledStream<E, H>
-    where
-        E: EndHandler,
-        H: ControlHandler,
-    {
-        ControlledStream::new_with_end(
-            Rc::clone(&self.stream_sock.sock),
-            Rc::clone(&self.stream_sock.file),
-            Rc::clone(&self.control_sock.sock),
-            Rc::clone(&self.control_sock.file),
-            handler,
-            end_handler,
-        )
-    }
-
-    /// Sends a single multipart to the socket
-    pub fn send(&self, multipart: Multipart) -> MultipartRequest {
-        self.stream_sock.send(multipart)
-    }
-
-    /// Receives a single multipart from the socket
-    pub fn recv(&self) -> MultipartResponse {
-        self.stream_sock.recv()
     }
 }

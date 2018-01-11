@@ -66,12 +66,12 @@ fn publisher_thread() {
     let handle = core.handle();
     let ctx = Rc::new(zmq::Context::new());
 
-    let publisher: Pub = Socket::create(Rc::clone(&ctx), &handle)
+    let publisher: Pub = Socket::builder(Rc::clone(&ctx), &handle)
         .bind("tcp://*:5561")
         .try_into()
         .unwrap();
 
-    let syncservice: Rep = Socket::create(ctx, &handle)
+    let syncservice: Rep = Socket::builder(ctx, &handle)
         .bind("tcp://*:5562")
         .try_into()
         .unwrap();
@@ -103,13 +103,13 @@ fn subscriber_thread() {
     let handle = core.handle();
     let ctx = Rc::new(zmq::Context::new());
 
-    let subscriber: Sub = Socket::create(Rc::clone(&ctx), &handle)
+    let subscriber: Sub = Socket::builder(Rc::clone(&ctx), &handle)
         .connect("tcp://localhost:5561")
         .filter(b"")
         .try_into()
         .unwrap();
 
-    let syncclient: Req = Socket::create(ctx, &handle)
+    let syncclient: Req = Socket::builder(ctx, &handle)
         .connect("tcp://localhost:5562")
         .try_into()
         .unwrap();
@@ -123,7 +123,8 @@ fn subscriber_thread() {
         .and_then(move |_| recv)
         .and_then(|_| {
             subscriber
-                .stream_with_end(Stop)
+                .stream()
+                .with_end(Stop)
                 .fold(0, |counter, _| Ok(counter + 1) as Result<usize, Error>)
                 .and_then(|total| {
                     println!("Received {} updates", total);

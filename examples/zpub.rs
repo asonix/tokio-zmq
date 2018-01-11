@@ -63,7 +63,7 @@ fn main() {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
     let ctx = Rc::new(zmq::Context::new());
-    let zpub: Pub = Socket::create(ctx, &handle)
+    let zpub: Pub = Socket::builder(ctx, &handle)
         .bind("tcp://*:5556")
         .try_into()
         .unwrap();

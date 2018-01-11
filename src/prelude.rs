@@ -19,24 +19,12 @@
 
 //! Provide useful types and traits for working with Tokio ZMQ.
 
-use socket::{ControlledSocket, Socket};
-use async::{ControlledStream, MultipartRequest, MultipartResponse, MultipartSink, MultipartStream};
+use socket::Socket;
+use async::{MultipartRequest, MultipartResponse, MultipartSink, MultipartStream};
 use message::Multipart;
 use error::Error;
 
 /* ----------------------------------TYPES----------------------------------- */
-
-/// The Default `EndHandler` struct. This type is never instantiated, but instead is used in place
-/// of a generic type for the default `MultipartStream` type.
-///
-/// It's `should_stop` method always returns false, although it should never be called.
-pub struct DefaultEndHandler;
-
-impl EndHandler for DefaultEndHandler {
-    fn should_stop(&mut self, _: &Multipart) -> bool {
-        false
-    }
-}
 
 /* ----------------------------------TRAITS---------------------------------- */
 
@@ -48,62 +36,6 @@ pub trait AsSocket {
 
     /// Any type implementing `AsSocket` must have a way of consuming itself and returning a socket.
     fn into_socket(self) -> Socket;
-}
-
-/// Analogous to the `AsSocket` trait, but for Controlled sockets.
-pub trait AsControlledSocket {
-    /// Any implementing type must have a method of getting a reference to the inner
-    /// `ControlledSocket`.
-    fn socket(&self) -> &ControlledSocket;
-}
-
-/// This trait is used for types wrapping `ControlledSocket`s. It depends on the type implementing
-/// `AsControlledSocket`, which is analogous to the `AsSocket` trait's `socket(&self)` method.
-pub trait ControlledStreamSocket: AsControlledSocket {
-    /// Receive a single multipart message from the socket.
-    fn recv(&self) -> MultipartResponse {
-        self.socket().recv()
-    }
-
-    /// Receive a stream of multipart messages from the socket.
-    fn stream<H>(&self, handler: H) -> ControlledStream<DefaultEndHandler, H>
-    where
-        H: ControlHandler,
-    {
-        self.socket().stream(handler)
-    }
-
-    /// Receive a stream of multipart messages from the socket, ending when handler or
-    /// end_handler's should_stop return true.
-    fn stream_with_end<E, H>(&self, handler: H, end_handler: E) -> ControlledStream<E, H>
-    where
-        H: ControlHandler,
-        E: EndHandler,
-    {
-        self.socket().stream_with_end(handler, end_handler)
-    }
-}
-
-/// In addition to having Streams, some sockets also have Sinks. Every controlled socket has a
-/// stream, but to give Sink functionality to those that have Sinks as well, this trait is
-/// implemented.
-pub trait ControlledSinkSocket: AsControlledSocket {
-    /// Send a single multipart message to the socket.
-    ///
-    /// For example usage of `send`, see `SinkSocket`'s send definition.
-    fn send(&self, multipart: Multipart) -> MultipartRequest {
-        self.socket().send(multipart)
-    }
-
-    /// Get a sink to send a stream of multipart messages to the socket.
-    ///
-    /// For example usage of `sink`, see `SinkSocket`'s sink definition.
-    fn sink<E>(&self) -> MultipartSink<E>
-    where
-        E: From<Error>,
-    {
-        self.socket().sink()
-    }
 }
 
 /// The `ControlHandler` trait is used to impose stopping rules for streams that otherwise would
@@ -126,17 +58,6 @@ pub trait EndHandler {
     /// the rest of the messages that socket receives. If you want to have a socket controlled by
     /// another socket, see the `ControlHandler` trait.
     fn should_stop(&mut self, multipart: &Multipart) -> bool;
-}
-
-/// The `IntoControlledSocket` trait is used on Streams to allow the stream to be controlled by
-/// messages from another socket.
-pub trait IntoControlledSocket: StreamSocket {
-    type Controlled: AsControlledSocket;
-
-    /// Construct a controlled version of the given socket.
-    fn controlled<S>(self, control: S) -> Self::Controlled
-    where
-        S: StreamSocket;
 }
 
 /// This trait provides the basic Stream support for ZeroMQ Sockets. It depends on `AsSocket`, but
@@ -165,7 +86,7 @@ pub trait StreamSocket: AsSocket {
     /// fn main() {
     ///     let core = Core::new().unwrap();
     ///     let context = Rc::new(zmq::Context::new());
-    ///     let rep: Rep = Socket::create(context, &core.handle())
+    ///     let rep: Rep = Socket::builder(context, &core.handle())
     ///         .connect("tcp://localhost:5568")
     ///         .try_into()
     ///         .unwrap();
@@ -209,7 +130,7 @@ pub trait StreamSocket: AsSocket {
     /// fn main() {
     ///     let core = Core::new().unwrap();
     ///     let context = Rc::new(zmq::Context::new());
-    ///     let sub: Sub = Socket::create(context, &core.handle())
+    ///     let sub: Sub = Socket::builder(context, &core.handle())
     ///         .connect("tcp://localhost:5569")
     ///         .filter(b"")
     ///         .try_into()
@@ -227,81 +148,8 @@ pub trait StreamSocket: AsSocket {
     ///     // core.run(fut).unwrap();
     ///     # let _ = fut;
     /// }
-    fn stream(&self) -> MultipartStream<DefaultEndHandler> {
+    fn stream(&self) -> MultipartStream {
         self.socket().stream()
-    }
-
-    /// Receive a stream of multipart messages from the socket ending when end_handler's
-    /// should_stop returns true.
-    ///
-    /// ### Example, using a Sub wrapper type
-    /// ```rust
-    /// #![feature(try_from)]
-    ///
-    /// extern crate zmq;
-    /// extern crate futures;
-    /// extern crate tokio_core;
-    /// extern crate tokio_zmq;
-    ///
-    /// use std::rc::Rc;
-    /// use std::convert::TryInto;
-    ///
-    /// use futures::Stream;
-    /// use tokio_core::reactor::Core;
-    /// use tokio_zmq::prelude::*;
-    /// use tokio_zmq::async::MultipartStream;
-    /// use tokio_zmq::{Error, Multipart, Socket, Sub};
-    ///
-    /// struct Stop {
-    ///     count: usize,
-    /// }
-    ///
-    /// impl Stop {
-    ///     fn new() -> Self {
-    ///         Stop {
-    ///             count: 0,
-    ///         }
-    ///     }
-    /// }
-    ///
-    /// impl EndHandler for Stop {
-    ///     fn should_stop(&mut self, multipart: &Multipart) -> bool {
-    ///         if self.count < 10 {
-    ///             self.count += 1;
-    ///
-    ///             false
-    ///         } else {
-    ///             true
-    ///         }
-    ///     }
-    /// }
-    ///
-    /// fn main() {
-    ///     let core = Core::new().unwrap();
-    ///     let context = Rc::new(zmq::Context::new());
-    ///     let sub: Sub = Socket::create(context, &core.handle())
-    ///         .connect("tcp://localhost:5569")
-    ///         .filter(b"")
-    ///         .try_into()
-    ///         .unwrap();
-    ///
-    ///     let fut = sub.stream_with_end(Stop::new()).for_each(|multipart| {
-    ///         for msg in multipart {
-    ///             if let Some(msg) = msg.as_str() {
-    ///                 println!("Message: {}", msg);
-    ///             }
-    ///         }
-    ///         Ok(())
-    ///     });
-    ///
-    ///     // core.run(fut).unwrap();
-    ///     # let _ = fut;
-    /// }
-    fn stream_with_end<E>(&self, end_handler: E) -> MultipartStream<E>
-    where
-        E: EndHandler,
-    {
-        self.socket().stream_with_end(end_handler)
     }
 }
 
@@ -330,7 +178,7 @@ pub trait SinkSocket: AsSocket {
     /// fn main() {
     ///     let mut core = Core::new().unwrap();
     ///     let context = Rc::new(zmq::Context::new());
-    ///     let zpub: Pub = Socket::create(context, &core.handle())
+    ///     let zpub: Pub = Socket::builder(context, &core.handle())
     ///         .connect("tcp://localhost:5569")
     ///         .try_into()
     ///         .unwrap();
@@ -369,7 +217,7 @@ pub trait SinkSocket: AsSocket {
     /// fn main() {
     ///     let mut core = Core::new().unwrap();
     ///     let context = Rc::new(zmq::Context::new());
-    ///     let zpub: Pub = Socket::create(context, &core.handle())
+    ///     let zpub: Pub = Socket::builder(context, &core.handle())
     ///         .connect("tcp://localhost:5570")
     ///         .try_into()
     ///         .unwrap();

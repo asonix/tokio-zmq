@@ -61,7 +61,7 @@ use file::ZmqFile;
 /// fn main() {
 ///     let mut core = Core::new().unwrap();
 ///     let context = Rc::new(zmq::Context::new());
-///     let socket = Socket::create(context, &core.handle())
+///     let socket = Socket::builder(context, &core.handle())
 ///         .bind("tcp://*:5568")
 ///         .build(zmq::PUB)
 ///         .unwrap();
