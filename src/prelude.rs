@@ -19,10 +19,15 @@
 
 //! Provide useful types and traits for working with Tokio ZMQ.
 
-use socket::Socket;
-use async::{MultipartRequest, MultipartResponse, MultipartSink, MultipartSinkStream,
-            MultipartStream};
+use std::time::Duration;
+
+use futures::Stream;
+
+use error::Error;
+use async::{ControlledStream, EndingStream, MultipartRequest, MultipartResponse, MultipartSink,
+            MultipartSinkStream, MultipartStream, TimeoutStream};
 use message::Multipart;
+use socket::Socket;
 
 /* ----------------------------------TYPES----------------------------------- */
 
@@ -237,11 +242,64 @@ pub trait SinkStreamSocket: AsSocket {
     fn sink_stream(self) -> MultipartSinkStream;
 }
 
+pub trait WithEndHandler: Stream<Item = Multipart, Error = Error> + Sized {
+    fn with_end_handler<E>(self, end_handler: E) -> EndingStream<E, Self>
+    where
+        E: EndHandler;
+}
+
+pub trait Controllable: Stream<Item = Multipart, Error = Error> + Sized {
+    fn controlled<H, S>(self, control_stream: S, handler: H) -> ControlledStream<H, S, Self>
+    where
+        H: ControlHandler,
+        S: Stream<Item = Multipart, Error = Error>;
+}
+
+pub trait WithTimeout: Stream<Error = Error> + Sized {
+    fn timeout(self, duration: Duration) -> TimeoutStream<Self>;
+}
+
+/* ----------------------------------impls----------------------------------- */
+
 impl<T> SinkStreamSocket for T
 where
     T: StreamSocket + SinkSocket,
 {
     fn sink_stream(self) -> MultipartSinkStream {
         self.socket().sink_stream()
+    }
+}
+
+impl<T> WithEndHandler for T
+where
+    T: Stream<Item = Multipart, Error = Error>,
+{
+    fn with_end_handler<E>(self, end_handler: E) -> EndingStream<E, Self>
+    where
+        E: EndHandler,
+    {
+        EndingStream::new(self, end_handler)
+    }
+}
+
+impl<T> Controllable for T
+where
+    T: Stream<Item = Multipart, Error = Error>,
+{
+    fn controlled<H, S>(self, control_stream: S, handler: H) -> ControlledStream<H, S, Self>
+    where
+        H: ControlHandler,
+        S: Stream<Item = Multipart, Error = Error>,
+    {
+        ControlledStream::new(self, control_stream, handler)
+    }
+}
+
+impl<T> WithTimeout for T
+where
+    T: Stream<Error = Error>,
+{
+    fn timeout(self, duration: Duration) -> TimeoutStream<Self> {
+        TimeoutStream::new(self, duration)
     }
 }

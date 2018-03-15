@@ -32,7 +32,7 @@ use async::future::MultipartResponse;
 use error::Error;
 use file::ZmqFile;
 use message::Multipart;
-use prelude::{ControlHandler, EndHandler, StreamSocket};
+use prelude::{ControlHandler, EndHandler};
 
 /// The `MultipartStream` Sink handles receiving streams of data from ZeroMQ Sockets.
 ///
@@ -120,28 +120,6 @@ impl MultipartStream {
         state
     }
 
-    /// Add a timeout to this stream
-    pub fn timeout(self, duration: Duration) -> TimeoutStream<Self> {
-        TimeoutStream::new(self, duration)
-    }
-
-    /// Add an EndHandler to this stream
-    pub fn with_end<E>(self, end_handler: E) -> EndingStream<E, Self>
-    where
-        E: EndHandler,
-    {
-        EndingStream::new(self, end_handler)
-    }
-
-    /// Add a control stream to this stream
-    pub fn controlled<A, H>(self, control: A, handler: H) -> ControlledStream<H, Self>
-    where
-        A: StreamSocket,
-        H: ControlHandler,
-    {
-        ControlledStream::new(self, control, handler)
-    }
-
     fn poll_response(
         &mut self,
         mut response: MultipartResponse,
@@ -205,20 +183,6 @@ where
             end_handler,
         }
     }
-
-    /// Add a timeout to this stream
-    pub fn timeout(self, duration: Duration) -> TimeoutStream<Self> {
-        TimeoutStream::new(self, duration)
-    }
-
-    /// Add a control stream to this stream
-    pub fn controlled<A, H>(self, control: A, handler: H) -> ControlledStream<H, Self>
-    where
-        A: StreamSocket,
-        H: ControlHandler,
-    {
-        ControlledStream::new(self, control, handler)
-    }
 }
 
 impl<E, S> Stream for EndingStream<E, S>
@@ -250,56 +214,41 @@ where
 /// It contains a handler that implements the `ControlHandler` trait. This trait contains a single
 /// method `should_stop`, that determines whether or not the given stream should stop producing
 /// values.
-pub struct ControlledStream<H, S>
+pub struct ControlledStream<H, S, T>
 where
     H: ControlHandler,
     S: Stream<Item = Multipart, Error = Error>,
+    T: Stream<Item = Multipart, Error = Error>,
 {
-    stream: S,
-    control: MultipartStream,
+    stream: T,
+    control: S,
     handler: H,
 }
 
-impl<H, S> ControlledStream<H, S>
+impl<H, S, T> ControlledStream<H, S, T>
 where
     H: ControlHandler,
     S: Stream<Item = Multipart, Error = Error>,
+    T: Stream<Item = Multipart, Error = Error>,
 {
     /// Create a new ControlledStream.
     ///
     /// This shouldn't be called directly. A socket wrapper type's `controlled` method, if present,
     /// will perform the required actions to create and encapsulate this type.
-    pub fn new<A>(stream: S, control_sock: A, handler: H) -> ControlledStream<H, S>
-    where
-        A: StreamSocket,
-    {
-        let control = control_sock.socket().stream();
-
+    pub fn new(stream: T, control: S, handler: H) -> ControlledStream<H, S, T> {
         ControlledStream {
             stream,
             control,
             handler,
         }
     }
-
-    /// Add a timeout to this stream
-    pub fn timeout(self, duration: Duration) -> TimeoutStream<Self> {
-        TimeoutStream::new(self, duration)
-    }
-
-    /// Add an EndHandler to this stream
-    pub fn with_end<E>(self, end_handler: E) -> EndingStream<E, Self>
-    where
-        E: EndHandler,
-    {
-        EndingStream::new(self, end_handler)
-    }
 }
 
-impl<H, S> Stream for ControlledStream<H, S>
+impl<H, S, T> Stream for ControlledStream<H, S, T>
 where
     H: ControlHandler,
     S: Stream<Item = Multipart, Error = Error>,
+    T: Stream<Item = Multipart, Error = Error>,
 {
     type Item = Multipart;
     type Error = Error;
