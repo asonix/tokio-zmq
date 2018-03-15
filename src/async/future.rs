@@ -199,6 +199,10 @@ impl MultipartRequest {
                     .clear_write_ready2(cx)?;
                 cx.waker().wake();
             } else {
+                self.file
+                    .as_ref()
+                    .ok_or(Error::Reused)?
+                    .clear_write_ready2(cx)?;
                 return Ok(false);
             }
         }
@@ -377,6 +381,10 @@ impl MultipartResponse {
                     .clear_read_ready2(cx, Ready::readable())?;
                 cx.waker().wake();
             } else {
+                self.file
+                    .as_ref()
+                    .ok_or(Error::Reused)?
+                    .clear_read_ready2(cx, Ready::readable())?;
                 return Ok(false);
             }
         }

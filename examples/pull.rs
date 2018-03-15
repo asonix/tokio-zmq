@@ -28,12 +28,10 @@ extern crate zmq;
 use std::sync::Arc;
 use std::convert::TryInto;
 
-use futures::{FutureExt, IntoFuture, StreamExt};
-use futures::future::Either;
+use futures::{FutureExt, StreamExt};
 use tokio_zmq::prelude::*;
 use tokio_zmq::{Pub, Pull, Sub};
 use tokio_zmq::{Multipart, Socket};
-use tokio_zmq::Error;
 
 pub struct Stop;
 
