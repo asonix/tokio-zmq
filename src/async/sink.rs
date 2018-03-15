@@ -20,13 +20,13 @@
 //! This module defines the `MultipartSink` type. A wrapper around Sockets that implements
 //! `futures::Stream`.
 
-use std::marker::PhantomData;
-use std::rc::Rc;
+use std::mem::swap;
 
 use zmq;
-use tokio_core::reactor::PollEvented;
+use tokio::reactor::PollEvented2;
+use futures::task::Context;
 use tokio_file_unix::File;
-use futures::{Async, AsyncSink, Future, Poll, Sink, StartSend};
+use futures::{Async, Future, Sink};
 
 use message::Multipart;
 use async::future::MultipartRequest;
@@ -72,82 +72,111 @@ use file::ZmqFile;
 ///     core.run(sink.send(msg.into())).unwrap();
 /// }
 /// ```
-pub struct MultipartSink<E>
-where
-    E: From<Error>,
-{
-    request: Option<MultipartRequest>,
-    sock: Rc<zmq::Socket>,
-    // Handles notifications to/from the event loop
-    file: Rc<PollEvented<File<ZmqFile>>>,
-    phantom: PhantomData<E>,
+pub struct MultipartSink {
+    inner: SinkState,
 }
 
-impl<E> MultipartSink<E>
-where
-    E: From<Error>,
-{
-    pub fn new(sock: Rc<zmq::Socket>, file: Rc<PollEvented<File<ZmqFile>>>) -> Self {
+pub(crate) enum SinkState {
+    Ready(zmq::Socket, PollEvented2<File<ZmqFile>>),
+    Pending(MultipartRequest),
+    Polling,
+}
+
+impl MultipartSink {
+    pub fn new(sock: zmq::Socket, file: PollEvented2<File<ZmqFile>>) -> Self {
         MultipartSink {
-            request: None,
-            sock: sock,
-            file: file,
-            phantom: PhantomData,
+            inner: SinkState::Ready(sock, file),
         }
     }
 
-    fn poll_request(&mut self, mut request: MultipartRequest) -> Poll<(), E> {
-        match request.poll()? {
-            Async::Ready(()) => Ok(Async::Ready(())),
-            Async::NotReady => {
-                self.request = Some(request);
-                Ok(Async::NotReady)
+    pub(crate) fn take_socket(&mut self) -> Option<(zmq::Socket, PollEvented2<File<ZmqFile>>)> {
+        match self.polling() {
+            SinkState::Ready(sock, file) => Some((sock, file)),
+            SinkState::Pending(mut request) => {
+                let opt = request.take_socket();
+                self.inner = SinkState::Pending(request);
+                opt
+            }
+            SinkState::Polling => None,
+        }
+    }
+
+    pub(crate) fn give_socket(&mut self, sock: zmq::Socket, file: PollEvented2<File<ZmqFile>>) {
+        match self.polling() {
+            SinkState::Pending(mut request) => {
+                request.give_socket(sock, file);
+                self.inner = SinkState::Pending(request);
+            }
+            _ => self.inner = SinkState::Ready(sock, file),
+        }
+    }
+
+    pub(crate) fn polling(&mut self) -> SinkState {
+        let mut state = SinkState::Polling;
+
+        swap(&mut state, &mut self.inner);
+
+        state
+    }
+
+    fn poll_request(
+        &mut self,
+        mut request: MultipartRequest,
+        cx: &mut Context,
+    ) -> Result<Async<()>, Error> {
+        match request.poll(cx)? {
+            Async::Ready((sock, file)) => {
+                self.inner = SinkState::Ready(sock, file);
+
+                Ok(Async::Ready(()))
+            }
+            Async::Pending => {
+                self.inner = SinkState::Pending(request);
+
+                Ok(Async::Pending)
             }
         }
     }
 
-    fn make_request(&mut self, multipart: Multipart) {
-        let sock = Rc::clone(&self.sock);
-        let file = Rc::clone(&self.file);
+    fn make_request(&mut self, multipart: Multipart) -> Result<(), Error> {
+        match self.polling() {
+            SinkState::Ready(sock, file) => {
+                file.clear_write_ready()?;
 
-        self.request = Some(MultipartRequest::new(sock, file, multipart));
+                self.inner = SinkState::Pending(MultipartRequest::new(sock, file, multipart));
+                Ok(())
+            }
+            _ => Err(Error::Sink),
+        }
     }
 }
 
-impl<E> Sink for MultipartSink<E>
-where
-    E: From<Error>,
-{
+impl Sink for MultipartSink {
     type SinkItem = Multipart;
-    type SinkError = E;
+    type SinkError = Error;
 
-    fn start_send(
-        &mut self,
-        multipart: Self::SinkItem,
-    ) -> StartSend<Self::SinkItem, Self::SinkError> {
-        if let Some(request) = self.request.take() {
-            match self.poll_request(request)? {
-                Async::Ready(()) => {
-                    self.make_request(multipart);
-                    self.file.need_write();
+    fn start_send(&mut self, multipart: Self::SinkItem) -> Result<(), Self::SinkError> {
+        self.make_request(multipart)?;
 
-                    Ok(AsyncSink::Ready)
-                }
-                Async::NotReady => Ok(AsyncSink::NotReady(multipart)),
+        Ok(())
+    }
+
+    fn poll_ready(&mut self, cx: &mut Context) -> Result<Async<()>, Self::SinkError> {
+        self.poll_flush(cx)
+    }
+
+    fn poll_flush(&mut self, cx: &mut Context) -> Result<Async<()>, Self::SinkError> {
+        match self.polling() {
+            SinkState::Pending(request) => self.poll_request(request, cx),
+            SinkState::Ready(sock, file) => {
+                self.inner = SinkState::Ready(sock, file);
+                Ok(Async::Ready(()))
             }
-        } else {
-            self.make_request(multipart);
-            self.file.need_write();
-
-            Ok(AsyncSink::Ready)
+            SinkState::Polling => Err(Error::Sink),
         }
     }
 
-    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        if let Some(request) = self.request.take() {
-            self.poll_request(request)
-        } else {
-            Ok(Async::Ready(()))
-        }
+    fn poll_close(&mut self, cx: &mut Context) -> Result<Async<()>, Self::SinkError> {
+        self.poll_flush(cx)
     }
 }

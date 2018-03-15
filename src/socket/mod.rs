@@ -25,69 +25,66 @@ pub mod types;
 use std::rc::Rc;
 
 use zmq;
-use tokio_core::reactor::{Handle, PollEvented};
+use tokio::reactor::PollEvented2;
 use tokio_file_unix::File;
 
 use self::config::SocketBuilder;
-use async::{MultipartRequest, MultipartResponse, MultipartSink, MultipartStream};
+use async::{MultipartRequest, MultipartResponse, MultipartSink, MultipartSinkStream,
+            MultipartStream};
 use message::Multipart;
-use error::Error;
 use file::ZmqFile;
 
 /// Defines the raw Socket type. This type should never be interacted with directly, except to
 /// create new instances of wrapper types.
-#[derive(Clone)]
 pub struct Socket {
     // Reads and Writes data
-    sock: Rc<zmq::Socket>,
+    sock: zmq::Socket,
     // So we can hand out files to streams and sinks
-    file: Rc<PollEvented<File<ZmqFile>>>,
+    file: PollEvented2<File<ZmqFile>>,
 }
 
 impl Socket {
     /// Start a new Socket Config builder
-    pub fn builder(ctx: Rc<zmq::Context>, handle: &Handle) -> SocketBuilder {
-        SocketBuilder::new(ctx, handle)
+    pub fn builder(ctx: Rc<zmq::Context>) -> SocketBuilder<'static> {
+        SocketBuilder::new(ctx)
     }
 
     /// Retrieve a Reference-Counted Pointer to self's socket.
-    pub fn inner_sock(&self) -> Rc<zmq::Socket> {
-        Rc::clone(&self.sock)
-    }
-
-    /// Retrieve a Reference-Counted Pointer to self's file.
-    pub fn inner_file(&self) -> Rc<PollEvented<File<ZmqFile>>> {
-        Rc::clone(&self.file)
+    pub fn inner(self) -> (zmq::Socket, PollEvented2<File<ZmqFile>>) {
+        (self.sock, self.file)
     }
 
     /// Create a new socket from a given Sock and File
     ///
     /// This assumes that `sock` is already configured properly. Please don't call this directly
     /// unless you know what you're doing.
-    pub fn from_sock_and_file(sock: Rc<zmq::Socket>, file: Rc<PollEvented<File<ZmqFile>>>) -> Self {
+    pub fn from_sock_and_file(sock: zmq::Socket, file: PollEvented2<File<ZmqFile>>) -> Self {
         Socket { sock, file }
     }
 
     /// Retrieve a Sink that consumes Multiparts, sending them to the socket
-    pub fn sink<E>(&self) -> MultipartSink<E>
-    where
-        E: From<Error>,
-    {
-        MultipartSink::new(Rc::clone(&self.sock), Rc::clone(&self.file))
+    pub fn sink(self) -> MultipartSink {
+        MultipartSink::new(self.sock, self.file)
     }
 
     /// Retrieve a Stream that produces Multiparts, getting them from the socket
-    pub fn stream(&self) -> MultipartStream {
-        MultipartStream::new(Rc::clone(&self.sock), Rc::clone(&self.file))
+    pub fn stream(self) -> MultipartStream {
+        MultipartStream::new(self.sock, self.file)
+    }
+
+    /// Retrieve a structure that is both a Stream that produces Multiparts and a Sink that
+    /// consumes Multiparts.
+    pub fn sink_stream(self) -> MultipartSinkStream {
+        MultipartSinkStream::new(self.sock, self.file)
     }
 
     /// Retrieve a Future that consumes a multipart, sending it to the socket
-    pub fn send(&self, multipart: Multipart) -> MultipartRequest {
-        MultipartRequest::new(Rc::clone(&self.sock), Rc::clone(&self.file), multipart)
+    pub fn send(self, multipart: Multipart) -> MultipartRequest {
+        MultipartRequest::new(self.sock, self.file, multipart)
     }
 
     /// Retrieve a Future that produces a multipart, getting it fromthe socket
-    pub fn recv(&self) -> MultipartResponse {
-        MultipartResponse::new(Rc::clone(&self.sock), Rc::clone(&self.file))
+    pub fn recv(self) -> MultipartResponse {
+        MultipartResponse::new(self.sock, self.file)
     }
 }

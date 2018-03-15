@@ -20,9 +20,9 @@
 //! Provide useful types and traits for working with Tokio ZMQ.
 
 use socket::Socket;
-use async::{MultipartRequest, MultipartResponse, MultipartSink, MultipartStream};
+use async::{MultipartRequest, MultipartResponse, MultipartSink, MultipartSinkStream,
+            MultipartStream};
 use message::Multipart;
-use error::Error;
 
 /* ----------------------------------TYPES----------------------------------- */
 
@@ -30,12 +30,9 @@ use error::Error;
 
 /// The `AsSocket` trait is implemented for all wrapper types. This makes implementing other traits a
 /// matter of saying a given type implements them.
-pub trait AsSocket {
+pub trait AsSocket: Sized {
     /// Any type implementing `AsSocket` must have a way of returning a reference to a Socket.
-    fn socket(&self) -> &Socket;
-
-    /// Any type implementing `AsSocket` must have a way of consuming itself and returning a socket.
-    fn into_socket(self) -> Socket;
+    fn socket(self) -> Socket;
 }
 
 /// The `ControlHandler` trait is used to impose stopping rules for streams that otherwise would
@@ -103,7 +100,7 @@ pub trait StreamSocket: AsSocket {
     ///     // core.run(fut).unwrap();
     ///     # let _ = fut;
     /// }
-    fn recv(&self) -> MultipartResponse {
+    fn recv(self) -> MultipartResponse {
         self.socket().recv()
     }
 
@@ -148,7 +145,7 @@ pub trait StreamSocket: AsSocket {
     ///     // core.run(fut).unwrap();
     ///     # let _ = fut;
     /// }
-    fn stream(&self) -> MultipartStream {
+    fn stream(self) -> MultipartStream {
         self.socket().stream()
     }
 }
@@ -189,7 +186,7 @@ pub trait SinkSocket: AsSocket {
     ///
     ///     core.run(fut).unwrap();
     /// }
-    fn send(&self, multipart: Multipart) -> MultipartRequest {
+    fn send(self, multipart: Multipart) -> MultipartRequest {
         self.socket().send(multipart)
     }
 
@@ -231,10 +228,20 @@ pub trait SinkSocket: AsSocket {
     ///
     ///     core.run(fut).unwrap();
     /// }
-    fn sink<E>(&self) -> MultipartSink<E>
-    where
-        E: From<Error>,
-    {
+    fn sink(self) -> MultipartSink {
         self.socket().sink()
+    }
+}
+
+pub trait SinkStreamSocket: AsSocket {
+    fn sink_stream(self) -> MultipartSinkStream;
+}
+
+impl<T> SinkStreamSocket for T
+where
+    T: StreamSocket + SinkSocket,
+{
+    fn sink_stream(self) -> MultipartSinkStream {
+        self.socket().sink_stream()
     }
 }
