@@ -141,8 +141,6 @@ impl MultipartSink {
     fn make_request(&mut self, multipart: Multipart) -> Result<(), Error> {
         match self.polling() {
             SinkState::Ready(sock, file) => {
-                file.clear_write_ready()?;
-
                 self.inner = SinkState::Pending(MultipartRequest::new(sock, file, multipart));
                 Ok(())
             }

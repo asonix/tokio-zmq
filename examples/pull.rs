@@ -20,18 +20,20 @@
 #![feature(try_from)]
 
 extern crate futures;
-extern crate tokio_core;
+extern crate tokio;
+extern crate tokio_executor;
 extern crate tokio_zmq;
 extern crate zmq;
 
-use std::rc::Rc;
+use std::sync::Arc;
 use std::convert::TryInto;
 
-use futures::{Future, Stream};
-use tokio_core::reactor::Core;
+use futures::{FutureExt, IntoFuture, StreamExt};
+use futures::future::Either;
 use tokio_zmq::prelude::*;
 use tokio_zmq::{Pub, Pull, Sub};
 use tokio_zmq::{Multipart, Socket};
+use tokio_zmq::Error;
 
 pub struct Stop;
 
@@ -43,42 +45,44 @@ impl ControlHandler for Stop {
 }
 
 fn main() {
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-    let ctx = Rc::new(zmq::Context::new());
-    let cmd: Sub = Socket::builder(Rc::clone(&ctx), &handle)
+    let ctx = Arc::new(zmq::Context::new());
+    let cmd: Sub = Socket::builder(Arc::clone(&ctx))
         .connect("tcp://localhost:5559")
         .filter(b"")
         .try_into()
         .unwrap();
-    let conn: Pull = Socket::builder(Rc::clone(&ctx), &handle)
+    let conn: Pull = Socket::builder(Arc::clone(&ctx))
         .bind("tcp://*:5558")
-        .try_into()
-        .unwrap();
-    let send_cmd: Pub = Socket::builder(ctx, &handle)
-        .bind("tcp://*:5559")
         .try_into()
         .unwrap();
 
     let process = conn.stream()
         .controlled(cmd, Stop)
-        .for_each(move |multipart| {
+        .map(move |multipart| {
             for msg in multipart {
                 if let Some(msg) = msg.as_str() {
                     println!("msg: '{}'", msg);
 
                     if msg == "STOP" {
-                        handle.spawn(
+                        let send_cmd: Pub = Socket::builder(ctx.clone())
+                            .bind("tcp://*:5559")
+                            .try_into()
+                            .unwrap();
+                        return Either::Right(
                             send_cmd
                                 .send(zmq::Message::from_slice(b"").unwrap().into())
-                                .map_err(|_| ()),
+                                .map(|_| ()),
                         );
                     }
                 }
             }
 
-            Ok(())
-        });
+            Either::Left((Ok(()) as Result<(), Error>).into_future())
+        })
+        .for_each(|_| Ok(()));
 
-    core.run(process).unwrap();
+    tokio::runtime::run2(process.map(|_| ()).or_else(|e| {
+        println!("Error: {:?}", e);
+        Ok(())
+    }));
 }

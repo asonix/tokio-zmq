@@ -22,7 +22,7 @@
 pub mod config;
 pub mod types;
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use zmq;
 use tokio::reactor::PollEvented2;
@@ -45,7 +45,7 @@ pub struct Socket {
 
 impl Socket {
     /// Start a new Socket Config builder
-    pub fn builder(ctx: Rc<zmq::Context>) -> SocketBuilder<'static> {
+    pub fn builder(ctx: Arc<zmq::Context>) -> SocketBuilder<'static> {
         SocketBuilder::new(ctx)
     }
 

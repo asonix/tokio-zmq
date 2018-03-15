@@ -19,7 +19,7 @@
 
 //! This module contains `SocketBuilder` and related types.
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use zmq;
 use tokio::reactor::PollEvented2;
@@ -47,7 +47,7 @@ fn connect_all(sock: zmq::Socket, connects: &[&str]) -> zmq::Result<zmq::Socket>
 ///
 /// This struct contains a context and an identity.
 pub struct SocketBuilder<'a> {
-    ctx: Rc<zmq::Context>,
+    ctx: Arc<zmq::Context>,
     identity: Option<&'a [u8]>,
 }
 
@@ -56,7 +56,7 @@ impl<'a> SocketBuilder<'a> {
     ///
     /// All sockets that are created through the Tokio ZMQ library will use this as the base for
     /// their socket builder (except PAIR sockets).
-    pub fn new(ctx: Rc<zmq::Context>) -> Self {
+    pub fn new(ctx: Arc<zmq::Context>) -> Self {
         SocketBuilder {
             ctx: ctx,
             identity: None,
@@ -121,7 +121,7 @@ impl<'a> SocketBuilder<'a> {
 /// This contains all the information required to contstruct a valid socket, except in the case of
 /// SUB, which needs an additional `filter` parameter.
 pub struct SockConfig<'a> {
-    pub ctx: Rc<zmq::Context>,
+    pub ctx: Arc<zmq::Context>,
     pub bind: Vec<&'a str>,
     pub connect: Vec<&'a str>,
     pub identity: Option<&'a [u8]>,
@@ -193,7 +193,7 @@ impl<'a> SockConfig<'a> {
 ///
 /// This contains all the information required to contstruct a valid SUB socket
 pub struct SubConfig<'a> {
-    pub ctx: Rc<zmq::Context>,
+    pub ctx: Arc<zmq::Context>,
     pub bind: Vec<&'a str>,
     pub connect: Vec<&'a str>,
     pub filter: &'a [u8],
@@ -241,7 +241,7 @@ impl<'a> SubConfig<'a> {
 ///
 /// This contains all the information required to contstruct a valid PAIR socket
 pub struct PairConfig<'a> {
-    ctx: Rc<zmq::Context>,
+    ctx: Arc<zmq::Context>,
     addr: &'a str,
     bind: bool,
     identity: Option<&'a [u8]>,

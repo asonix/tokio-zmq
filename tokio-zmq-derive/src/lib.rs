@@ -25,11 +25,7 @@ fn socket_derive(s: synstructure::Structure) -> quote::Tokens {
         let as_socket = s.bound_impl(
             "::prelude::AsSocket",
             quote! {
-                fn socket(&self) -> &Socket {
-                    &self.inner
-                }
-
-                fn into_socket(self) -> Socket {
+                fn socket(self) -> Socket {
                     self.inner
                 }
             },

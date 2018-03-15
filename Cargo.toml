@@ -21,5 +21,9 @@ zmq = "0.8"
 git = "https://github.com/tokio-rs/tokio.git"
 features = [ "unstable-futures" ]
 
+[dev-dependencies.tokio-executor]
+git = "https://github.com/tokio-rs/tokio.git"
+features = [ "unstable-futures" ]
+
 [dev-dependencies]
 env_logger = "0.4"
