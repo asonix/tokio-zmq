@@ -55,31 +55,39 @@ fn main() {
         .bind("tcp://*:5558")
         .try_into()
         .unwrap();
+    let send_cmd: Pub = Socket::builder(ctx)
+        .bind("tcp://*:5559")
+        .try_into()
+        .unwrap();
 
     let process = conn.stream()
         .controlled(cmd, Stop)
-        .map(move |multipart| {
-            for msg in multipart {
-                if let Some(msg) = msg.as_str() {
-                    println!("msg: '{}'", msg);
+        .filter_map(|multipart| {
+            Ok(multipart
+                .into_iter()
+                .filter_map(|msg| {
+                    let stop = if let Some(s_msg) = msg.as_str() {
+                        println!("msg: '{}'", s_msg);
+                        if s_msg == "STOP" {
+                            true
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    };
 
-                    if msg == "STOP" {
-                        let send_cmd: Pub = Socket::builder(ctx.clone())
-                            .bind("tcp://*:5559")
-                            .try_into()
-                            .unwrap();
-                        return Either::Right(
-                            send_cmd
-                                .send(zmq::Message::from_slice(b"").unwrap().into())
-                                .map(|_| ()),
-                        );
+                    if stop {
+                        Some(msg)
+                    } else {
+                        None
                     }
-                }
-            }
-
-            Either::Left((Ok(()) as Result<(), Error>).into_future())
+                })
+                .collect::<Vec<_>>()
+                .pop()
+                .map(Multipart::from))
         })
-        .for_each(|_| Ok(()));
+        .forward(send_cmd.sink());
 
     tokio::runtime::run2(process.map(|_| ()).or_else(|e| {
         println!("Error: {:?}", e);
