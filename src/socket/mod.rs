@@ -79,12 +79,24 @@ impl Socket {
     }
 
     /// Retrieve a Future that consumes a multipart, sending it to the socket
-    pub fn send(self, multipart: Multipart) -> MultipartRequest {
+    pub fn send<T>(self, multipart: Multipart) -> MultipartRequest<T>
+    where
+        T: From<(zmq::Socket, PollEvented2<File<ZmqFile>>)>,
+    {
         MultipartRequest::new(self.sock, self.file, multipart)
     }
 
     /// Retrieve a Future that produces a multipart, getting it fromthe socket
-    pub fn recv(self) -> MultipartResponse {
+    pub fn recv<T>(self) -> MultipartResponse<T>
+    where
+        T: From<(zmq::Socket, PollEvented2<File<ZmqFile>>)>,
+    {
         MultipartResponse::new(self.sock, self.file)
+    }
+}
+
+impl From<(zmq::Socket, PollEvented2<File<ZmqFile>>)> for Socket {
+    fn from((sock, file): (zmq::Socket, PollEvented2<File<ZmqFile>>)) -> Self {
+        Socket { sock, file }
     }
 }

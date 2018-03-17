@@ -59,7 +59,7 @@ fn main() {
 
     let runner = stream
         .stream()
-        .controlled(cmd, Stop)
+        .controlled(cmd.stream(), Stop)
         .map(|multipart| {
             for msg in &multipart {
                 if let Some(msg) = msg.as_str() {

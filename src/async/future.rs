@@ -20,6 +20,8 @@
 //! This module contains definitions for `MultipartRequest` and `MultipartResponse`, the two types that
 //! implement `futures::Future`.
 
+use std::marker::PhantomData;
+
 use futures::{Async, Future};
 use futures::task::Context;
 use mio::Ready;
@@ -74,18 +76,26 @@ use message::Multipart;
 /// })
 /// # }
 /// ```
-pub struct MultipartRequest {
+pub struct MultipartRequest<T>
+where
+    T: From<(zmq::Socket, PollEvented2<File<ZmqFile>>)>,
+{
     sock: Option<zmq::Socket>,
     file: Option<PollEvented2<File<ZmqFile>>>,
     multipart: Option<Multipart>,
+    phantom: PhantomData<T>,
 }
 
-impl MultipartRequest {
+impl<T> MultipartRequest<T>
+where
+    T: From<(zmq::Socket, PollEvented2<File<ZmqFile>>)>,
+{
     pub fn new(sock: zmq::Socket, file: PollEvented2<File<ZmqFile>>, multipart: Multipart) -> Self {
         MultipartRequest {
             sock: Some(sock),
             file: Some(file),
             multipart: Some(multipart),
+            phantom: PhantomData,
         }
     }
 
@@ -211,8 +221,11 @@ impl MultipartRequest {
     }
 }
 
-impl Future for MultipartRequest {
-    type Item = (zmq::Socket, PollEvented2<File<ZmqFile>>);
+impl<T> Future for MultipartRequest<T>
+where
+    T: From<(zmq::Socket, PollEvented2<File<ZmqFile>>)>,
+{
+    type Item = T;
     type Error = Error;
 
     fn poll(&mut self, cx: &mut Context) -> Result<Async<Self::Item>, Self::Error> {
@@ -223,7 +236,7 @@ impl Future for MultipartRequest {
                         let sock = self.sock.take().ok_or(Error::Reused)?;
                         let file = self.file.take().ok_or(Error::Reused)?;
 
-                        Async::Ready((sock, file))
+                        Async::Ready((sock, file).into())
                     }
                     _ => Async::Pending,
                 })
@@ -275,18 +288,26 @@ impl Future for MultipartRequest {
 /// })
 /// # }
 /// ```
-pub struct MultipartResponse {
+pub struct MultipartResponse<T>
+where
+    T: From<(zmq::Socket, PollEvented2<File<ZmqFile>>)>,
+{
     sock: Option<zmq::Socket>,
     file: Option<PollEvented2<File<ZmqFile>>>,
     multipart: Option<Multipart>,
+    phantom: PhantomData<T>,
 }
 
-impl MultipartResponse {
+impl<T> MultipartResponse<T>
+where
+    T: From<(zmq::Socket, PollEvented2<File<ZmqFile>>)>,
+{
     pub fn new(sock: zmq::Socket, file: PollEvented2<File<ZmqFile>>) -> Self {
         MultipartResponse {
             sock: Some(sock),
             file: Some(file),
             multipart: None,
+            phantom: PhantomData,
         }
     }
 
@@ -393,8 +414,11 @@ impl MultipartResponse {
     }
 }
 
-impl Future for MultipartResponse {
-    type Item = (Multipart, zmq::Socket, PollEvented2<File<ZmqFile>>);
+impl<T> Future for MultipartResponse<T>
+where
+    T: From<(zmq::Socket, PollEvented2<File<ZmqFile>>)>,
+{
+    type Item = (Multipart, T);
     type Error = Error;
 
     fn poll(&mut self, cx: &mut Context) -> Result<Async<Self::Item>, Self::Error> {
@@ -405,7 +429,7 @@ impl Future for MultipartResponse {
                         let sock = self.sock.take().ok_or(Error::Reused)?;
                         let file = self.file.take().ok_or(Error::Reused)?;
 
-                        Async::Ready((multipart, sock, file))
+                        Async::Ready((multipart, (sock, file).into()))
                     }
                     _ => Async::Pending,
                 })

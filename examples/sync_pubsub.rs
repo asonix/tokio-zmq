@@ -118,11 +118,11 @@ fn subscriber_thread() {
 
     let runner = syncclient
         .send(msg.into())
-        .and_then(|(sock, file)| Socket::from_sock_and_file(sock, file).recv())
+        .and_then(|syncclient| syncclient.recv())
         .and_then(move |_| {
             subscriber
                 .stream()
-                .with_end(Stop)
+                .with_end_handler(Stop)
                 .fold(0, |counter, _| Ok(counter + 1) as Result<usize, Error>)
                 .and_then(|total| {
                     println!("Received {} updates", total);

@@ -78,7 +78,7 @@ pub struct MultipartSink {
 
 pub(crate) enum SinkState {
     Ready(zmq::Socket, PollEvented2<File<ZmqFile>>),
-    Pending(MultipartRequest),
+    Pending(MultipartRequest<(zmq::Socket, PollEvented2<File<ZmqFile>>)>),
     Polling,
 }
 
@@ -121,7 +121,7 @@ impl MultipartSink {
 
     fn poll_request(
         &mut self,
-        mut request: MultipartRequest,
+        mut request: MultipartRequest<(zmq::Socket, PollEvented2<File<ZmqFile>>)>,
         cx: &mut Context,
     ) -> Result<Async<()>, Error> {
         match request.poll(cx)? {

@@ -59,7 +59,7 @@ fn main() {
         .unwrap();
 
     let process = conn.stream()
-        .controlled(cmd, Stop)
+        .controlled(cmd.stream(), Stop)
         .filter_map(|multipart| {
             Ok(multipart
                 .into_iter()

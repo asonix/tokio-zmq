@@ -21,11 +21,14 @@
 
 use std::convert::TryFrom;
 
+use tokio::reactor::PollEvented2;
+use tokio_file_unix::File;
 use zmq;
 
+use error::Error;
+use file::ZmqFile;
 use socket::config::{PairConfig, SockConfig, SubConfig};
 use socket::Socket;
-use error::Error;
 
 /* -------------------------------------------------------------------------- */
 

@@ -79,7 +79,7 @@ pub struct MultipartStream {
 
 pub(crate) enum StreamState {
     Ready(zmq::Socket, PollEvented2<File<ZmqFile>>),
-    Pending(MultipartResponse),
+    Pending(MultipartResponse<(zmq::Socket, PollEvented2<File<ZmqFile>>)>),
     Polling,
 }
 
@@ -122,11 +122,11 @@ impl MultipartStream {
 
     fn poll_response(
         &mut self,
-        mut response: MultipartResponse,
+        mut response: MultipartResponse<(zmq::Socket, PollEvented2<File<ZmqFile>>)>,
         cx: &mut Context,
     ) -> Result<Async<Option<Multipart>>, Error> {
         match response.poll(cx)? {
-            Async::Ready((item, sock, file)) => {
+            Async::Ready((item, (sock, file))) => {
                 self.inner = StreamState::Ready(sock, file);
 
                 Ok(Async::Ready(Some(item)))

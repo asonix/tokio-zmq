@@ -22,10 +22,14 @@
 use std::time::Duration;
 
 use futures::Stream;
+use tokio::reactor::PollEvented2;
+use tokio_file_unix::File;
+use zmq;
 
-use error::Error;
 use async::{ControlledStream, EndingStream, MultipartRequest, MultipartResponse, MultipartSink,
             MultipartSinkStream, MultipartStream, TimeoutStream};
+use error::Error;
+use file::ZmqFile;
 use message::Multipart;
 use socket::Socket;
 
@@ -35,7 +39,7 @@ use socket::Socket;
 
 /// The `AsSocket` trait is implemented for all wrapper types. This makes implementing other traits a
 /// matter of saying a given type implements them.
-pub trait AsSocket: Sized {
+pub trait AsSocket: From<(zmq::Socket, PollEvented2<File<ZmqFile>>)> + Sized {
     /// Any type implementing `AsSocket` must have a way of returning a reference to a Socket.
     fn socket(self) -> Socket;
 }
@@ -105,7 +109,7 @@ pub trait StreamSocket: AsSocket {
     ///     // core.run(fut).unwrap();
     ///     # let _ = fut;
     /// }
-    fn recv(self) -> MultipartResponse {
+    fn recv(self) -> MultipartResponse<Self> {
         self.socket().recv()
     }
 
@@ -191,7 +195,7 @@ pub trait SinkSocket: AsSocket {
     ///
     ///     core.run(fut).unwrap();
     /// }
-    fn send(self, multipart: Multipart) -> MultipartRequest {
+    fn send(self, multipart: Multipart) -> MultipartRequest<Self> {
         self.socket().send(multipart)
     }
 

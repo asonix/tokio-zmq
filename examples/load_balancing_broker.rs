@@ -149,8 +149,8 @@ fn client_task(client_num: usize) -> usize {
     let msg = zmq::Message::from_slice(b"HELLO").unwrap();
     let fut = client
         .send(msg.into())
-        .and_then(|(sock, file)| Socket::from_sock_and_file(sock, file).recv())
-        .and_then(move |(multipart, _, _)| {
+        .and_then(|client| client.recv())
+        .and_then(move |(multipart, _)| {
             if let Some(msg) = multipart.get(0) {
                 println!("Client {}: {:?}", client_num, msg.as_str());
             }
@@ -185,8 +185,8 @@ fn worker_task(worker_num: usize) -> usize {
     let fut = worker
         .send(msg.into())
         .map_err(Error::from)
-        .and_then(move |(sock, file)| {
-            let (sink, stream) = Socket::from_sock_and_file(sock, file).sink_stream().split();
+        .and_then(move |worker| {
+            let (sink, stream) = worker.sink_stream().split();
 
             stream
                 .controlled(control.stream(), Stop("worker", worker_num))

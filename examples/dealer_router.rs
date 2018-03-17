@@ -63,8 +63,8 @@ fn client() {
 
     println!("Sending 'Hewwo?' for 0");
     let runner = req.send(zmq::Message::from_slice(b"Hewwo?").unwrap().into())
-        .and_then(|(sock, file)| {
-            let (sink, stream) = Socket::from_sock_and_file(sock, file).sink_stream().split();
+        .and_then(|req| {
+            let (sink, stream) = req.sink_stream().split();
 
             stream
                 .zip(iter_ok(1..CLIENT_REQUESTS))
