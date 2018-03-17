@@ -39,7 +39,8 @@ use tokio_zmq::{Pub, Req, Router, Sub};
 use tokio_zmq::{Multipart, Socket};
 
 const NUM_CLIENTS: usize = 1000;
-const NUM_WORKERS: usize = 3;
+const NUM_WORKERS: usize = 5;
+const BATCH_SIZE: usize = 10;
 
 /* ----------------------------------Error----------------------------------- */
 
@@ -368,7 +369,7 @@ fn main() {
 
             let clients = (0..NUM_CLIENTS)
                 .map(|client_num| {
-                    if client_num % 5 == 0 {
+                    if client_num % BATCH_SIZE == 0 {
                         println!("Sleeping to avoid too many open files");
                         thread::sleep(Duration::from_millis(20));
                     }
