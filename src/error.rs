@@ -75,4 +75,12 @@ impl StdError for Error {
             Error::Timer(_) => "Error creating timed stream",
         }
     }
+
+    fn cause(&self) -> Option<&StdError> {
+        match *self {
+            Error::Zmq(ref e) => Some(e),
+            Error::Io(ref e) => Some(e),
+            Error::Timer(ref e) => Some(e),
+        }
+    }
 }
