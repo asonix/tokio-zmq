@@ -263,14 +263,11 @@ fn broker_task() {
                 .map(|_| multipart)
                 .map_err(|_| Error::WorkerSend)
         })
-        .and_then(|mut multipart| {
+        .filter_map(|mut multipart| {
             let empty = multipart.pop_front().ok_or(Error::NotEnoughMessages)?;
             assert!(empty.is_empty());
             let client_id = multipart.pop_front().ok_or(Error::NotEnoughMessages)?;
 
-            Ok((multipart, client_id))
-        })
-        .filter_map(|(multipart, client_id)| {
             if &*client_id == b"READY" {
                 Ok(None)
             } else {
