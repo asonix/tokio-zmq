@@ -22,25 +22,25 @@
 extern crate env_logger;
 extern crate futures;
 extern crate log;
-extern crate tokio_core;
+extern crate tokio;
 extern crate tokio_zmq;
 extern crate zmq;
 
 use std::env;
 use std::convert::{TryFrom, TryInto};
-use std::rc::Rc;
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-use futures::{Future, Sink, Stream};
-use futures::sync::mpsc;
-use tokio_core::reactor::Core;
+use futures::{FutureExt, SinkExt, StreamExt};
+use futures::channel::mpsc;
 use tokio_zmq::prelude::*;
 use tokio_zmq::{Pub, Req, Router, Sub};
 use tokio_zmq::{Multipart, Socket};
 
 const NUM_CLIENTS: usize = 1000;
-const NUM_WORKERS: usize = 3;
+const NUM_WORKERS: usize = 5;
+const BATCH_SIZE: usize = 10;
 
 /* ----------------------------------Error----------------------------------- */
 
@@ -126,11 +126,11 @@ impl From<Envelope> for Multipart {
 
 /* -----------------------------------Stop----------------------------------- */
 
-struct Stop;
+struct Stop(&'static str, usize);
 
 impl ControlHandler for Stop {
     fn should_stop(&mut self, _: Multipart) -> bool {
-        println!("Received stop signal!");
+        println!("Received stop signal! {}/{}", self.0, self.1);
         true
     }
 }
@@ -138,73 +138,80 @@ impl ControlHandler for Stop {
 /* ----------------------------------client---------------------------------- */
 
 fn client_task(client_num: usize) -> usize {
-    let mut core = Core::new().unwrap();
-    let context = Rc::new(zmq::Context::new());
+    let context = Arc::new(zmq::Context::new());
 
-    let client: Req = Socket::builder(context, &core.handle())
+    let client: Req = Socket::builder(context)
         .identity(format!("c{}", client_num).as_bytes())
         .connect("tcp://localhost:5672")
         .try_into()
         .unwrap();
 
     let msg = zmq::Message::from_slice(b"HELLO").unwrap();
-    let resp = client.recv();
     let fut = client
         .send(msg.into())
-        .and_then(|_| resp)
-        .and_then(|multipart| {
+        .and_then(|(sock, file)| Socket::from_sock_and_file(sock, file).recv())
+        .and_then(move |(multipart, _, _)| {
             if let Some(msg) = multipart.get(0) {
                 println!("Client {}: {:?}", client_num, msg.as_str());
             }
             Ok(())
         });
 
-    core.run(fut).unwrap();
+    tokio::runtime::run2(fut.map(|_| ()).or_else(|e| {
+        println!("Error in client: {:?}", e);
+        Ok(())
+    }));
     client_num
 }
 
 /* ----------------------------------worker---------------------------------- */
 
 fn worker_task(worker_num: usize) -> usize {
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-    let context = Rc::new(zmq::Context::new());
+    let context = Arc::new(zmq::Context::new());
 
-    let control: Sub = Socket::builder(Rc::clone(&context), &handle)
+    let control: Sub = Socket::builder(Arc::clone(&context))
         .connect("tcp://localhost:5674")
         .filter(b"")
         .try_into()
         .unwrap();
-    let worker: Req = Socket::builder(context, &handle)
+    let worker: Req = Socket::builder(context)
         .identity(format!("w{}", worker_num).as_bytes())
         .connect("tcp://localhost:5673")
         .try_into()
         .unwrap();
 
     let msg = zmq::Message::from_slice(b"READY").unwrap();
-    let fut = worker.send(msg.into()).map_err(Error::from);
 
-    let inner_fut = worker
-        .stream()
-        .controlled(control, Stop)
+    let fut = worker
+        .send(msg.into())
         .map_err(Error::from)
-        .and_then(|multipart| {
-            let mut envelope: Envelope = multipart.try_into()?;
+        .and_then(move |(sock, file)| {
+            let (sink, stream) = Socket::from_sock_and_file(sock, file).sink_stream().split();
 
-            println!(
-                "Worker: {:?} from {:?}",
-                envelope.request().as_str(),
-                envelope.addr().as_str()
-            );
+            stream
+                .controlled(control.stream(), Stop("worker", worker_num))
+                .map_err(Error::from)
+                .and_then(|multipart| {
+                    let mut envelope: Envelope = multipart.try_into()?;
 
-            let msg = zmq::Message::from_slice(b"OK")?;
-            envelope.set_request(msg);
+                    println!(
+                        "Worker: {:?} from {:?}",
+                        envelope.request().as_str(),
+                        envelope.addr().as_str()
+                    );
 
-            Ok(envelope.into())
-        })
-        .forward(worker.sink::<Error>());
+                    let msg = zmq::Message::from_slice(b"OK")?;
+                    envelope.set_request(msg);
 
-    core.run(fut.and_then(|_| inner_fut)).unwrap();
+                    Ok(envelope.into())
+                })
+                .forward(sink)
+        });
+
+    tokio::runtime::run2(fut.map(|_| ()).or_else(|e| {
+        println!("Error in worker: {:?}", e);
+        Ok(())
+    }));
     println!("Worker {} is done", worker_num);
     worker_num
 }
@@ -212,56 +219,59 @@ fn worker_task(worker_num: usize) -> usize {
 /* ----------------------------------broker---------------------------------- */
 
 fn broker_task() {
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-    let context = Rc::new(zmq::Context::new());
+    let context = Arc::new(zmq::Context::new());
 
-    let frontend: Router = Socket::builder(Rc::clone(&context), &handle)
+    let frontend: Router = Socket::builder(Arc::clone(&context))
         .bind("tcp://*:5672")
         .try_into()
         .unwrap();
 
-    let control: Sub = Socket::builder(Rc::clone(&context), &handle)
+    let control0: Sub = Socket::builder(Arc::clone(&context))
         .connect("tcp://localhost:5674")
         .filter(b"")
         .try_into()
         .unwrap();
 
-    let backend: Router = Socket::builder(context, &handle)
+    let control1: Sub = Socket::builder(Arc::clone(&context))
+        .connect("tcp://localhost:5674")
+        .filter(b"")
+        .try_into()
+        .unwrap();
+
+    let backend: Router = Socket::builder(context)
         .bind("tcp://*:5673")
         .try_into()
         .unwrap();
 
     let (worker_send, worker_recv) = mpsc::channel::<zmq::Message>(10);
 
-    let back2front = backend
-        .stream()
-        .controlled(control, Stop)
+    let (frontend_sink, frontend_stream) = frontend.sink_stream().split();
+    let (backend_sink, backend_stream) = backend.sink_stream().split();
+
+    let back2front = backend_stream
+        .controlled(control0.stream(), Stop("broker", 0))
         .map_err(Error::from)
         .and_then(|mut multipart| {
             let worker_id = multipart.pop_front().ok_or(Error::NotEnoughMessages)?;
 
             Ok((multipart, worker_id))
         })
-        .and_then(|(multipart, worker_id)| {
+        .and_then(move |(multipart, worker_id)| {
             worker_send
                 .clone()
                 .send(worker_id)
                 .map(|_| multipart)
                 .map_err(|_| Error::WorkerSend)
         })
-        .and_then(|mut multipart| {
+        .filter_map(|mut multipart| {
             let empty = multipart.pop_front().ok_or(Error::NotEnoughMessages)?;
             assert!(empty.is_empty());
             let client_id = multipart.pop_front().ok_or(Error::NotEnoughMessages)?;
 
-            Ok((multipart, client_id))
-        })
-        .filter_map(|(multipart, client_id)| {
             if &*client_id == b"READY" {
-                None
+                Ok(None)
             } else {
-                Some((multipart, client_id))
+                Ok(Some((multipart, client_id)))
             }
         })
         .and_then(|(mut multipart, client_id)| {
@@ -277,10 +287,10 @@ fn broker_task() {
 
             Ok(response)
         })
-        .forward(frontend.sink::<Error>());
+        .forward(frontend_sink);
 
-    let front2back = frontend
-        .stream()
+    let front2back = frontend_stream
+        .controlled(control1.stream(), Stop("broker", 1))
         .map_err(Error::from)
         .zip(worker_recv.map_err(|_| Error::WorkerRecv))
         .and_then(|(mut multipart, worker_id)| {
@@ -299,13 +309,12 @@ fn broker_task() {
 
             Ok(response)
         })
-        .forward(backend.sink::<Error>())
-        .map(|_| ())
-        .map_err(|e| println!("Error: {:?}", e));
+        .forward(backend_sink);
 
-    handle.spawn(front2back);
-
-    core.run(back2front).unwrap();
+    tokio::runtime::run2(front2back.join(back2front).map(|_| ()).or_else(|e| {
+        println!("Error in broker: {:?}", e);
+        Ok(())
+    }));
     println!("Broker is done");
 }
 
@@ -345,9 +354,8 @@ fn main() {
     match use_broker {
         UseBroker::No | UseBroker::All => {
             // Set up control socket
-            let mut core = Core::new().unwrap();
-            let context = Rc::new(zmq::Context::new());
-            let control: Pub = Socket::builder(context, &core.handle())
+            let context = Arc::new(zmq::Context::new());
+            let control: Pub = Socket::builder(context)
                 .bind("tcp://*:5674")
                 .try_into()
                 .unwrap();
@@ -358,7 +366,7 @@ fn main() {
 
             let clients = (0..NUM_CLIENTS)
                 .map(|client_num| {
-                    if client_num % 20 == 0 {
+                    if client_num % BATCH_SIZE == 0 {
                         println!("Sleeping to avoid too many open files");
                         thread::sleep(Duration::from_millis(20));
                     }
@@ -372,8 +380,15 @@ fn main() {
             }
 
             // Signal end when all clients have joined
-            core.run(control.send(zmq::Message::new().unwrap().into()))
-                .unwrap();
+            tokio::runtime::run2(
+                control
+                    .send(zmq::Message::new().unwrap().into())
+                    .map(|_| ())
+                    .or_else(|e| {
+                        println!("Error in main loop {:?}", e);
+                        Ok(())
+                    }),
+            );
 
             for worker in workers {
                 let worker_num = worker.join().unwrap();

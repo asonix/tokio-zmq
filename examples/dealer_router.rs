@@ -22,21 +22,21 @@
 extern crate env_logger;
 extern crate futures;
 extern crate log;
-extern crate tokio_core;
+extern crate tokio;
+extern crate tokio_executor;
 extern crate tokio_zmq;
 extern crate zmq;
 
-use std::rc::Rc;
 use std::convert::TryInto;
-use std::thread;
 use std::env;
+use std::sync::Arc;
+use std::thread;
 
 use futures::stream::iter_ok;
-use futures::{Future, Stream};
-use tokio_core::reactor::Core;
+use futures::{FutureExt, StreamExt};
 use tokio_zmq::prelude::*;
 use tokio_zmq::{Dealer, Pub, Rep, Req, Router, Sub};
-use tokio_zmq::{Error, Multipart, Socket};
+use tokio_zmq::{Multipart, Socket};
 
 const CLIENT_REQUESTS: usize = 1000;
 
@@ -50,69 +50,79 @@ impl ControlHandler for Stop {
 }
 
 fn client() {
-    let mut core = Core::new().unwrap();
-    let ctx = Rc::new(zmq::Context::new());
-    let handle = core.handle();
-    let req: Req = Socket::builder(Rc::clone(&ctx), &handle)
+    let ctx = Arc::new(zmq::Context::new());
+    let req: Req = Socket::builder(Arc::clone(&ctx))
         .connect("tcp://localhost:5559")
         .try_into()
         .unwrap();
 
-    let zpub: Pub = Socket::builder(Rc::clone(&ctx), &handle)
+    let zpub: Pub = Socket::builder(Arc::clone(&ctx))
         .bind("tcp://*:5561")
         .try_into()
         .unwrap();
 
-    let runner = iter_ok(0..CLIENT_REQUESTS)
-        .and_then(|request_nbr| {
-            let msg = zmq::Message::from_slice(b"Hewwo?").unwrap();
+    println!("Sending 'Hewwo?' for 0");
+    let runner = req.send(zmq::Message::from_slice(b"Hewwo?").unwrap().into())
+        .and_then(|(sock, file)| {
+            let (sink, stream) = Socket::from_sock_and_file(sock, file).sink_stream().split();
 
-            println!("Sending 'Hewwo?' for {}", request_nbr);
+            stream
+                .zip(iter_ok(1..CLIENT_REQUESTS))
+                .map(|(multipart, request_nbr)| {
+                    for msg in multipart {
+                        if let Some(msg) = msg.as_str() {
+                            println!("Received reply {} {}", request_nbr, msg);
+                        }
+                    }
 
-            let response = req.recv();
-            let request = req.send(msg.into());
-
-            request.and_then(move |_| response.map(move |multipart| (request_nbr, multipart)))
+                    println!("Sending 'Hewwo?' for {}", request_nbr);
+                    zmq::Message::from_slice(b"Hewwo?").unwrap().into()
+                })
+                .forward(sink)
         })
-        .for_each(|(request_nbr, multipart)| {
-            for msg in multipart {
-                if let Some(msg) = msg.as_str() {
-                    println!("Received reply {} {}", request_nbr, msg);
-                }
-            }
+        .and_then(move |(stream, _sink)| {
+            stream
+                .into_future()
+                .map_err(|(e, _)| e)
+                .and_then(|(maybe_last_item, _stream)| {
+                    if let Some(multipart) = maybe_last_item {
+                        for msg in multipart {
+                            if let Some(msg) = msg.as_str() {
+                                println!("Received last reply {}", msg);
+                            }
+                        }
+                    }
 
-            Ok(())
-        })
-        .and_then(|_| {
-            let msg = zmq::Message::from_slice(b"").unwrap();
+                    let msg = zmq::Message::from_slice(b"").unwrap();
 
-            zpub.send(msg.into())
+                    zpub.send(msg.into())
+                })
         });
 
-    let res = core.run(runner);
-    if let Err(e) = res {
-        println!("client bailed: {:?}", e);
-    }
+    tokio::runtime::run2(runner.map(|_| ()).or_else(|e| {
+        println!("Error in client: {:?}", e);
+        Ok(())
+    }));
 }
 
 fn worker() {
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-    let ctx = Rc::new(zmq::Context::new());
+    let ctx = Arc::new(zmq::Context::new());
 
-    let rep: Rep = Socket::builder(Rc::clone(&ctx), &handle)
+    let rep: Rep = Socket::builder(Arc::clone(&ctx))
         .connect("tcp://localhost:5560")
         .try_into()
         .unwrap();
 
-    let cmd: Sub = Socket::builder(Rc::clone(&ctx), &handle)
+    let cmd: Sub = Socket::builder(Arc::clone(&ctx))
         .connect("tcp://localhost:5561")
         .filter(b"")
         .try_into()
         .unwrap();
 
-    let runner = rep.stream()
-        .controlled(cmd, Stop)
+    let (rep_sink, rep_stream) = rep.sink_stream().split();
+
+    let runner = rep_stream
+        .controlled(cmd.stream(), Stop)
         .map(|multipart| {
             for msg in multipart {
                 if let Some(msg) = msg.as_str() {
@@ -124,44 +134,43 @@ fn worker() {
 
             msg.into()
         })
-        .forward(rep.sink::<Error>());
+        .forward(rep_sink);
 
-    let res = core.run(runner);
-
-    if let Err(e) = res {
-        println!("worker bailed: {:?}", e);
-    }
+    tokio::runtime::run2(runner.map(|_| ()).or_else(|e| {
+        println!("Error in worker: {:?}", e);
+        Ok(())
+    }));
 }
 
 fn broker() {
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-    let ctx = Rc::new(zmq::Context::new());
+    let ctx = Arc::new(zmq::Context::new());
 
-    let router: Router = Socket::builder(Rc::clone(&ctx), &handle)
+    let router: Router = Socket::builder(Arc::clone(&ctx))
         .bind("tcp://*:5559")
         .try_into()
         .unwrap();
 
-    let dealer: Dealer = Socket::builder(Rc::clone(&ctx), &handle)
+    let dealer: Dealer = Socket::builder(Arc::clone(&ctx))
         .bind("tcp://*:5560")
         .try_into()
         .unwrap();
 
-    let cmd1: Sub = Socket::builder(Rc::clone(&ctx), &handle)
+    let cmd1: Sub = Socket::builder(Arc::clone(&ctx))
         .connect("tcp://localhost:5561")
         .filter(b"")
         .try_into()
         .unwrap();
-    let cmd2: Sub = Socket::builder(Rc::clone(&ctx), &handle)
+    let cmd2: Sub = Socket::builder(Arc::clone(&ctx))
         .connect("tcp://localhost:5561")
         .filter(b"")
         .try_into()
         .unwrap();
 
-    let d2r = dealer
-        .stream()
-        .controlled(cmd1, Stop)
+    let (dealer_sink, dealer_stream) = dealer.sink_stream().split();
+    let (router_sink, router_stream) = router.sink_stream().split();
+
+    let d2r = dealer_stream
+        .controlled(cmd1.stream(), Stop)
         .map(|multipart| {
             for msg in &multipart {
                 if let Some(msg) = msg.as_str() {
@@ -172,11 +181,10 @@ fn broker() {
             }
             multipart
         })
-        .forward(router.sink::<Error>());
+        .forward(router_sink);
 
-    let r2d = router
-        .stream()
-        .controlled(cmd2, Stop)
+    let r2d = router_stream
+        .controlled(cmd2.stream(), Stop)
         .map(|multipart| {
             for msg in &multipart {
                 if let Some(msg) = msg.as_str() {
@@ -187,14 +195,12 @@ fn broker() {
             }
             multipart
         })
-        .forward(dealer.sink::<Error>());
+        .forward(dealer_sink);
 
-    handle.spawn(d2r.map(|_| ()).map_err(|e| println!("d2r bailed: {:?}", e)));
-    let res = core.run(r2d);
-
-    if let Err(e) = res {
+    tokio::runtime::run2(d2r.join(r2d).map(|_| ()).or_else(|e| {
         println!("broker bailed: {:?}", e);
-    }
+        Ok(())
+    }));
 }
 
 #[derive(Debug, PartialEq)]

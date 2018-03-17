@@ -20,23 +20,20 @@
 #![feature(try_from)]
 
 extern crate futures;
-extern crate tokio_core;
+extern crate tokio;
 extern crate tokio_zmq;
 extern crate zmq;
 
-use std::rc::Rc;
+use std::sync::Arc;
 use std::convert::TryInto;
 
-use futures::Stream;
-use tokio_core::reactor::Core;
+use futures::{FutureExt, StreamExt};
 use tokio_zmq::prelude::*;
 use tokio_zmq::{Socket, Sub};
 
 fn main() {
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-    let ctx = Rc::new(zmq::Context::new());
-    let sub: Sub = Socket::builder(ctx, &handle)
+    let ctx = Arc::new(zmq::Context::new());
+    let sub: Sub = Socket::builder(ctx)
         .connect("tcp://localhost:5556")
         .filter(b"")
         .try_into()
@@ -52,5 +49,8 @@ fn main() {
         Ok(())
     });
 
-    core.run(consumer).unwrap();
+    tokio::runtime::run2(consumer.map(|_| ()).or_else(|e| {
+        println!("Error in consumer: {:?}", e);
+        Ok(())
+    }));
 }

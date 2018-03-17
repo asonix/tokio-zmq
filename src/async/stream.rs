@@ -17,12 +17,13 @@
  * along with Tokio ZMQ.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::rc::Rc;
+use std::mem::swap;
 use std::time::Duration;
 
-use futures::{Async, Future, Poll, Stream};
+use futures::{Async, Future, Stream};
 use futures::future::Either;
-use tokio_core::reactor::PollEvented;
+use futures::task::Context;
+use tokio::reactor::PollEvented2;
 use tokio_file_unix::File;
 use tokio_timer::{Sleep, Timer};
 use zmq;
@@ -31,7 +32,7 @@ use async::future::MultipartResponse;
 use error::Error;
 use file::ZmqFile;
 use message::Multipart;
-use prelude::{ControlHandler, EndHandler, StreamSocket};
+use prelude::{ControlHandler, EndHandler};
 
 /// The `MultipartStream` Sink handles receiving streams of data from ZeroMQ Sockets.
 ///
@@ -73,52 +74,67 @@ use prelude::{ControlHandler, EndHandler, StreamSocket};
 /// }
 /// ```
 pub struct MultipartStream {
-    // To build a multipart
-    response: Option<MultipartResponse>,
-    // To read data
-    sock: Rc<zmq::Socket>,
-    // Handles notifications to/from the event loop
-    file: Rc<PollEvented<File<ZmqFile>>>,
+    inner: StreamState,
+}
+
+pub(crate) enum StreamState {
+    Ready(zmq::Socket, PollEvented2<File<ZmqFile>>),
+    Pending(MultipartResponse),
+    Polling,
 }
 
 impl MultipartStream {
-    pub fn new(sock: Rc<zmq::Socket>, file: Rc<PollEvented<File<ZmqFile>>>) -> Self {
+    pub fn new(sock: zmq::Socket, file: PollEvented2<File<ZmqFile>>) -> Self {
         MultipartStream {
-            response: None,
-            sock: sock,
-            file: file,
+            inner: StreamState::Ready(sock, file),
         }
     }
 
-    /// Add a timeout to this stream
-    pub fn timeout(self, duration: Duration) -> TimeoutStream<Self> {
-        TimeoutStream::new(self, duration)
+    pub(crate) fn take_socket(&mut self) -> Option<(zmq::Socket, PollEvented2<File<ZmqFile>>)> {
+        match self.polling() {
+            StreamState::Ready(sock, file) => Some((sock, file)),
+            StreamState::Pending(mut response) => {
+                let opt = response.take_socket();
+                self.inner = StreamState::Pending(response);
+                opt
+            }
+            StreamState::Polling => None,
+        }
     }
 
-    /// Add an EndHandler to this stream
-    pub fn with_end<E>(self, end_handler: E) -> EndingStream<E, Self>
-    where
-        E: EndHandler,
-    {
-        EndingStream::new(self, end_handler)
+    pub(crate) fn give_socket(&mut self, sock: zmq::Socket, file: PollEvented2<File<ZmqFile>>) {
+        match self.polling() {
+            StreamState::Pending(mut response) => {
+                response.give_socket(sock, file);
+                self.inner = StreamState::Pending(response);
+            }
+            _ => self.inner = StreamState::Ready(sock, file),
+        }
     }
 
-    /// Add a control stream to this stream
-    pub fn controlled<A, H>(self, control: A, handler: H) -> ControlledStream<H, Self>
-    where
-        A: StreamSocket,
-        H: ControlHandler,
-    {
-        ControlledStream::new(self, control, handler)
+    pub(crate) fn polling(&mut self) -> StreamState {
+        let mut state = StreamState::Polling;
+
+        swap(&mut self.inner, &mut state);
+
+        state
     }
 
-    fn poll_response(&mut self, mut response: MultipartResponse) -> Poll<Option<Multipart>, Error> {
-        match response.poll()? {
-            Async::Ready(item) => Ok(Async::Ready(Some(item))),
-            Async::NotReady => {
-                self.response = Some(response);
-                self.file.need_read();
-                Ok(Async::NotReady)
+    fn poll_response(
+        &mut self,
+        mut response: MultipartResponse,
+        cx: &mut Context,
+    ) -> Result<Async<Option<Multipart>>, Error> {
+        match response.poll(cx)? {
+            Async::Ready((item, sock, file)) => {
+                self.inner = StreamState::Ready(sock, file);
+
+                Ok(Async::Ready(Some(item)))
+            }
+            Async::Pending => {
+                self.inner = StreamState::Pending(response);
+
+                Ok(Async::Pending)
             }
         }
     }
@@ -128,12 +144,15 @@ impl Stream for MultipartStream {
     type Item = Multipart;
     type Error = Error;
 
-    fn poll(&mut self) -> Poll<Option<Multipart>, Error> {
-        if let Some(response) = self.response.take() {
-            self.poll_response(response)
-        } else {
-            let response = MultipartResponse::new(Rc::clone(&self.sock), Rc::clone(&self.file));
-            self.poll_response(response)
+    fn poll_next(&mut self, cx: &mut Context) -> Result<Async<Option<Multipart>>, Self::Error> {
+        match self.polling() {
+            StreamState::Ready(sock, file) => {
+                let response = MultipartResponse::new(sock, file);
+
+                self.poll_response(response, cx)
+            }
+            StreamState::Pending(response) => self.poll_response(response, cx),
+            StreamState::Polling => Err(Error::Stream),
         }
     }
 }
@@ -164,20 +183,6 @@ where
             end_handler,
         }
     }
-
-    /// Add a timeout to this stream
-    pub fn timeout(self, duration: Duration) -> TimeoutStream<Self> {
-        TimeoutStream::new(self, duration)
-    }
-
-    /// Add a control stream to this stream
-    pub fn controlled<A, H>(self, control: A, handler: H) -> ControlledStream<H, Self>
-    where
-        A: StreamSocket,
-        H: ControlHandler,
-    {
-        ControlledStream::new(self, control, handler)
-    }
 }
 
 impl<E, S> Stream for EndingStream<E, S>
@@ -188,15 +193,15 @@ where
     type Item = Multipart;
     type Error = Error;
 
-    fn poll(&mut self) -> Poll<Option<Multipart>, Error> {
-        let res = match self.stream.poll()? {
+    fn poll_next(&mut self, cx: &mut Context) -> Result<Async<Option<Multipart>>, Error> {
+        let res = match self.stream.poll_next(cx)? {
             Async::Ready(Some(item)) => if self.end_handler.should_stop(&item) {
                 Async::Ready(None)
             } else {
                 Async::Ready(Some(item))
             },
             Async::Ready(None) => Async::Ready(None),
-            Async::NotReady => Async::NotReady,
+            Async::Pending => Async::Pending,
         };
 
         Ok(res)
@@ -209,56 +214,41 @@ where
 /// It contains a handler that implements the `ControlHandler` trait. This trait contains a single
 /// method `should_stop`, that determines whether or not the given stream should stop producing
 /// values.
-pub struct ControlledStream<H, S>
+pub struct ControlledStream<H, S, T>
 where
     H: ControlHandler,
     S: Stream<Item = Multipart, Error = Error>,
+    T: Stream<Item = Multipart, Error = Error>,
 {
-    stream: S,
-    control: MultipartStream,
+    stream: T,
+    control: S,
     handler: H,
 }
 
-impl<H, S> ControlledStream<H, S>
+impl<H, S, T> ControlledStream<H, S, T>
 where
     H: ControlHandler,
     S: Stream<Item = Multipart, Error = Error>,
+    T: Stream<Item = Multipart, Error = Error>,
 {
     /// Create a new ControlledStream.
     ///
     /// This shouldn't be called directly. A socket wrapper type's `controlled` method, if present,
     /// will perform the required actions to create and encapsulate this type.
-    pub fn new<A>(stream: S, control_sock: A, handler: H) -> ControlledStream<H, S>
-    where
-        A: StreamSocket,
-    {
-        let control = control_sock.into_socket().stream();
-
+    pub fn new(stream: T, control: S, handler: H) -> ControlledStream<H, S, T> {
         ControlledStream {
             stream,
             control,
             handler,
         }
     }
-
-    /// Add a timeout to this stream
-    pub fn timeout(self, duration: Duration) -> TimeoutStream<Self> {
-        TimeoutStream::new(self, duration)
-    }
-
-    /// Add an EndHandler to this stream
-    pub fn with_end<E>(self, end_handler: E) -> EndingStream<E, Self>
-    where
-        E: EndHandler,
-    {
-        EndingStream::new(self, end_handler)
-    }
 }
 
-impl<H, S> Stream for ControlledStream<H, S>
+impl<H, S, T> Stream for ControlledStream<H, S, T>
 where
     H: ControlHandler,
     S: Stream<Item = Multipart, Error = Error>,
+    T: Stream<Item = Multipart, Error = Error>,
 {
     type Item = Multipart;
     type Error = Error;
@@ -268,9 +258,9 @@ where
     /// If the control stream is ready, but has ended, stop the producting stream.
     /// If the control stream is ready with a Multipart, use the `ControlHandler`
     /// to determine if the producting stream should be stopped.
-    fn poll(&mut self) -> Poll<Option<Multipart>, Error> {
-        let stop = match self.control.poll()? {
-            Async::NotReady => false,
+    fn poll_next(&mut self, cx: &mut Context) -> Result<Async<Option<Multipart>>, Error> {
+        let stop = match self.control.poll_next(cx)? {
+            Async::Pending => false,
             Async::Ready(None) => true,
             Async::Ready(Some(multipart)) => self.handler.should_stop(multipart),
         };
@@ -278,7 +268,7 @@ where
         if stop {
             Ok(Async::Ready(None))
         } else {
-            self.stream.poll()
+            self.stream.poll_next(cx)
         }
     }
 }
@@ -324,17 +314,17 @@ where
     type Item = Either<S::Item, Timeout>;
     type Error = Error;
 
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        if let Async::Ready(_) = self.timeout.poll()? {
+    fn poll_next(&mut self, cx: &mut Context) -> Result<Async<Option<Self::Item>>, Self::Error> {
+        if let Async::Ready(_) = self.timeout.poll(cx)? {
             self.timeout = self.timer.sleep(self.duration);
 
-            return Ok(Async::Ready(Some(Either::B(Timeout))));
+            return Ok(Async::Ready(Some(Either::Right(Timeout))));
         }
 
-        let res = match self.stream.poll()? {
-            Async::Ready(Some(item)) => Async::Ready(Some(Either::A(item))),
+        let res = match self.stream.poll_next(cx)? {
+            Async::Ready(Some(item)) => Async::Ready(Some(Either::Left(item))),
             Async::Ready(None) => Async::Ready(None),
-            Async::NotReady => Async::NotReady,
+            Async::Pending => Async::Pending,
         };
 
         Ok(res)

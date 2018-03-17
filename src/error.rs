@@ -37,6 +37,12 @@ pub enum Error {
     Io(IoError),
     /// Stores Tokio Timer errors
     Timer(TimerError),
+    /// If Sink socket is not done handling current request
+    Sink,
+    /// If Stream socket is not done handling current request
+    Stream,
+    /// If a future is used after it is consumed
+    Reused,
 }
 
 impl From<ZmqError> for Error {
