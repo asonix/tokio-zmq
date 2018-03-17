@@ -21,7 +21,7 @@
 
 extern crate futures;
 extern crate tokio;
-extern crate tokio_timer;
+extern crate tokio_timer_futures2 as tokio_timer;
 extern crate tokio_zmq;
 extern crate zmq;
 

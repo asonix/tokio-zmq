@@ -66,11 +66,7 @@ fn main() {
                 .filter_map(|msg| {
                     let stop = if let Some(s_msg) = msg.as_str() {
                         println!("msg: '{}'", s_msg);
-                        if s_msg == "STOP" {
-                            true
-                        } else {
-                            false
-                        }
+                        s_msg == "STOP"
                     } else {
                         false
                     };

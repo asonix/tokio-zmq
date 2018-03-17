@@ -58,7 +58,7 @@ impl<'a> SocketBuilder<'a> {
     /// their socket builder (except PAIR sockets).
     pub fn new(ctx: Arc<zmq::Context>) -> Self {
         SocketBuilder {
-            ctx: ctx,
+            ctx,
             identity: None,
         }
     }
@@ -81,7 +81,7 @@ impl<'a> SocketBuilder<'a> {
 
         SockConfig {
             ctx: self.ctx,
-            bind: bind,
+            bind,
             connect: Vec::new(),
             identity: self.identity,
         }
@@ -98,7 +98,7 @@ impl<'a> SocketBuilder<'a> {
         SockConfig {
             ctx: self.ctx,
             bind: Vec::new(),
-            connect: connect,
+            connect,
             identity: self.identity,
         }
     }
@@ -109,8 +109,8 @@ impl<'a> SocketBuilder<'a> {
     pub fn pair(self, addr: &'a str, bind: bool) -> PairConfig<'a> {
         PairConfig {
             ctx: self.ctx,
-            addr: addr,
-            bind: bind,
+            addr,
+            bind,
             identity: self.identity,
         }
     }
