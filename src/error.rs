@@ -17,9 +17,12 @@
  * along with Tokio ZMQ.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+use std::error::Error as StdError;
+use std::fmt;
 use std::io::Error as IoError;
-use zmq::Error as ZmqError;
+
 use tokio_timer::TimerError;
+use zmq::Error as ZmqError;
 
 /// Defines the error type for Tokio ZMQ.
 ///
@@ -51,5 +54,33 @@ impl From<IoError> for Error {
 impl From<TimerError> for Error {
     fn from(e: TimerError) -> Self {
         Error::Timer(e)
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Error::Zmq(ref e) => write!(f, "Error from ZeroMQ: {}", e),
+            Error::Io(ref e) => write!(f, "Error creating file descriptor: {}", e),
+            Error::Timer(ref e) => write!(f, "Error creating timer: {}", e),
+        }
+    }
+}
+
+impl StdError for Error {
+    fn description(&self) -> &str {
+        match *self {
+            Error::Zmq(_) => "Error interacting with ZeroMQ",
+            Error::Io(_) => "Error building socket",
+            Error::Timer(_) => "Error creating timed stream",
+        }
+    }
+
+    fn cause(&self) -> Option<&StdError> {
+        match *self {
+            Error::Zmq(ref e) => Some(e),
+            Error::Io(ref e) => Some(e),
+            Error::Timer(ref e) => Some(e),
+        }
     }
 }

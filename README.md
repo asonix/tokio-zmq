@@ -25,7 +25,7 @@ See the [examples folder](https://github.com/asonix/zmq-futures/tree/master/exam
 Add the following to your Cargo.toml
 ```toml
 zmq = "0.8"
-tokio-zmq = "0.3.0"
+tokio-zmq = "0.3.1"
 futures = "0.1"
 tokio-core = "0.1"
 ```
@@ -38,23 +38,23 @@ use std::convert::TryInto;
 use futures::Stream;
 use tokio_core::reactor::Core;
 use tokio_zmq::prelude::*;
-use tokio_zmq::{Socket, Error};
+use tokio_zmq::{Error, Socket};
 use tokio_zmq::Rep; // the socket type you want
 
 fn main() {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
-    let context = Rc::new(zmq::Context::new());
-    let rep: Rep = Socket::create(context, &handle)
+    let ctx = Rc::new(zmq::Context::new());
+    let rep: Rep = Socket::builder(ctx, &handle)
         .bind("tcp://*:5560")
         .try_into()
-        .unwrap()
+        .unwrap();
 
     let runner = rep.stream()
-        .and_then(|multipart| {
+        .map(|multipart| {
             // handle the Multipart
             // This example simply echos the incoming data back to the client.
-            Ok(multipart)
+            multipart
         })
         .forward(rep.sink::<Error>());
 
