@@ -37,6 +37,12 @@ pub enum Error {
     Io(IoError),
     /// Stores Tokio Timer errors
     Timer(TimerError),
+    /// If Sink socket is not done handling current request
+    Sink,
+    /// If Stream socket is not done handling current request
+    Stream,
+    /// If a future is used after it is consumed
+    Reused,
 }
 
 impl From<ZmqError> for Error {
@@ -63,6 +69,9 @@ impl fmt::Display for Error {
             Error::Zmq(ref e) => write!(f, "Error from ZeroMQ: {}", e),
             Error::Io(ref e) => write!(f, "Error creating file descriptor: {}", e),
             Error::Timer(ref e) => write!(f, "Error creating timer: {}", e),
+            Error::Sink => write!(f, "Could not send message to ZeroMQ"),
+            Error::Stream => write!(f, "Could not receive message from ZeroMQ"),
+            Error::Reused => write!(f, "Attempted to re-use already-used future"),
         }
     }
 }
@@ -73,6 +82,9 @@ impl StdError for Error {
             Error::Zmq(_) => "Error interacting with ZeroMQ",
             Error::Io(_) => "Error building socket",
             Error::Timer(_) => "Error creating timed stream",
+            Error::Sink => "Could not send message to ZeroMQ",
+            Error::Stream => "Could not receive message from ZeroMQ",
+            Error::Reused => "Attempted to re-use already-used future",
         }
     }
 
@@ -81,6 +93,7 @@ impl StdError for Error {
             Error::Zmq(ref e) => Some(e),
             Error::Io(ref e) => Some(e),
             Error::Timer(ref e) => Some(e),
+            _ => None,
         }
     }
 }

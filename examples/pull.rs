@@ -20,15 +20,15 @@
 #![feature(try_from)]
 
 extern crate futures;
-extern crate tokio_core;
+extern crate tokio;
+extern crate tokio_executor;
 extern crate tokio_zmq;
 extern crate zmq;
 
-use std::rc::Rc;
+use std::sync::Arc;
 use std::convert::TryInto;
 
-use futures::{Future, Stream};
-use tokio_core::reactor::Core;
+use futures::{FutureExt, StreamExt};
 use tokio_zmq::prelude::*;
 use tokio_zmq::{Pub, Pull, Sub};
 use tokio_zmq::{Multipart, Socket};
@@ -43,42 +43,48 @@ impl ControlHandler for Stop {
 }
 
 fn main() {
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-    let ctx = Rc::new(zmq::Context::new());
-    let cmd: Sub = Socket::builder(Rc::clone(&ctx), &handle)
+    let ctx = Arc::new(zmq::Context::new());
+    let cmd: Sub = Socket::builder(Arc::clone(&ctx))
         .connect("tcp://localhost:5559")
         .filter(b"")
         .try_into()
         .unwrap();
-    let conn: Pull = Socket::builder(Rc::clone(&ctx), &handle)
+    let conn: Pull = Socket::builder(Arc::clone(&ctx))
         .bind("tcp://*:5558")
         .try_into()
         .unwrap();
-    let send_cmd: Pub = Socket::builder(ctx, &handle)
+    let send_cmd: Pub = Socket::builder(ctx)
         .bind("tcp://*:5559")
         .try_into()
         .unwrap();
 
     let process = conn.stream()
-        .controlled(cmd, Stop)
-        .for_each(move |multipart| {
-            for msg in multipart {
-                if let Some(msg) = msg.as_str() {
-                    println!("msg: '{}'", msg);
+        .controlled(cmd.stream(), Stop)
+        .filter_map(|multipart| {
+            Ok(multipart
+                .into_iter()
+                .filter_map(|msg| {
+                    let stop = if let Some(s_msg) = msg.as_str() {
+                        println!("msg: '{}'", s_msg);
+                        s_msg == "STOP"
+                    } else {
+                        false
+                    };
 
-                    if msg == "STOP" {
-                        handle.spawn(
-                            send_cmd
-                                .send(zmq::Message::from_slice(b"").unwrap().into())
-                                .map_err(|_| ()),
-                        );
+                    if stop {
+                        Some(msg)
+                    } else {
+                        None
                     }
-                }
-            }
+                })
+                .collect::<Vec<_>>()
+                .pop()
+                .map(Multipart::from))
+        })
+        .forward(send_cmd.sink());
 
-            Ok(())
-        });
-
-    core.run(process).unwrap();
+    tokio::runtime::run2(process.map(|_| ()).or_else(|e| {
+        println!("Error: {:?}", e);
+        Ok(())
+    }));
 }

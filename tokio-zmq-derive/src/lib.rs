@@ -22,20 +22,26 @@ fn socket_derive(s: synstructure::Structure) -> quote::Tokens {
     });
 
     if let Some(sb) = socket_binding {
+        let name = sb.ast().ident;
+        let from_parts = s.bound_impl(
+            "From<(zmq::Socket, PollEvented2<File<ZmqFile>>)>",
+            quote! {
+                fn from(tup: (zmq::Socket, PollEvented2<File<ZmqFile>>)) -> Self {
+                    #name {
+                        inner: tup.into(),
+                    }
+                }
+            },
+        );
         let as_socket = s.bound_impl(
             "::prelude::AsSocket",
             quote! {
-                fn socket(&self) -> &Socket {
-                    &self.inner
-                }
-
-                fn into_socket(self) -> Socket {
+                fn socket(self) -> Socket {
                     self.inner
                 }
             },
         );
 
-        let name = sb.ast().ident;
         let try_from = build_try_from(&s, name);
 
         let stream = if has_attr(&s, "stream") {
@@ -51,6 +57,7 @@ fn socket_derive(s: synstructure::Structure) -> quote::Tokens {
         };
 
         quote! {
+            #from_parts
             #as_socket
             #stream
             #sink

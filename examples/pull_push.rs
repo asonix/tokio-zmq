@@ -20,18 +20,17 @@
 #![feature(try_from)]
 
 extern crate futures;
-extern crate tokio_core;
+extern crate tokio;
 extern crate tokio_zmq;
 extern crate zmq;
 
-use std::rc::Rc;
+use std::sync::Arc;
 use std::convert::TryInto;
 
-use futures::Stream;
-use tokio_core::reactor::Core;
+use futures::{FutureExt, StreamExt};
 use tokio_zmq::prelude::*;
 use tokio_zmq::{Pull, Push, Sub};
-use tokio_zmq::{Error as ZmqFutError, Multipart, Socket};
+use tokio_zmq::{Multipart, Socket};
 
 pub struct Stop;
 
@@ -43,26 +42,24 @@ impl ControlHandler for Stop {
 }
 
 fn main() {
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-    let ctx = Rc::new(zmq::Context::new());
-    let cmd: Sub = Socket::builder(Rc::clone(&ctx), &handle)
+    let ctx = Arc::new(zmq::Context::new());
+    let cmd: Sub = Socket::builder(Arc::clone(&ctx))
         .connect("tcp://localhost:5559")
         .filter(b"")
         .try_into()
         .unwrap();
-    let stream: Pull = Socket::builder(Rc::clone(&ctx), &handle)
+    let stream: Pull = Socket::builder(Arc::clone(&ctx))
         .connect("tcp://localhost:5557")
         .try_into()
         .unwrap();
-    let sink: Push = Socket::builder(ctx, &handle)
+    let sink: Push = Socket::builder(ctx)
         .connect("tcp://localhost:5558")
         .try_into()
         .unwrap();
 
     let runner = stream
         .stream()
-        .controlled(cmd, Stop)
+        .controlled(cmd.stream(), Stop)
         .map(|multipart| {
             for msg in &multipart {
                 if let Some(msg) = msg.as_str() {
@@ -71,7 +68,10 @@ fn main() {
             }
             multipart
         })
-        .forward(sink.sink::<ZmqFutError>());
+        .forward(sink.sink());
 
-    core.run(runner).unwrap();
+    tokio::runtime::run2(runner.map(|_| ()).or_else(|e| {
+        println!("Error!: {:?}", e);
+        Ok(())
+    }));
 }

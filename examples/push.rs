@@ -20,18 +20,19 @@
 #![feature(try_from)]
 
 extern crate futures;
-extern crate tokio_core;
+extern crate tokio;
+extern crate tokio_timer_futures2 as tokio_timer;
 extern crate tokio_zmq;
 extern crate zmq;
 
 use std::io;
-use std::rc::Rc;
+use std::sync::Arc;
 use std::time::Duration;
 use std::convert::TryInto;
 
-use futures::{Future, Stream};
+use futures::{FutureExt, StreamExt};
 use futures::stream::iter_ok;
-use tokio_core::reactor::{Core, Interval};
+use tokio_timer::{Timer, TimerError};
 use tokio_zmq::prelude::*;
 use tokio_zmq::{Error as ZmqFutError, Push, Socket};
 
@@ -40,6 +41,7 @@ enum Error {
     ZmqFut(ZmqFutError),
     Zmq(zmq::Error),
     Io(io::Error),
+    Timer(TimerError),
 }
 
 impl From<ZmqFutError> for Error {
@@ -60,15 +62,23 @@ impl From<io::Error> for Error {
     }
 }
 
+impl From<TimerError> for Error {
+    fn from(e: TimerError) -> Self {
+        Error::Timer(e)
+    }
+}
+
 fn main() {
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-    let ctx = Rc::new(zmq::Context::new());
-    let workers: Push = Socket::builder(Rc::clone(&ctx), &handle)
+    let ctx = Arc::new(zmq::Context::new());
+    let workers: Push = Socket::builder(Arc::clone(&ctx))
         .bind("tcp://*:5557")
         .try_into()
         .unwrap();
-    let sink: Push = Socket::builder(ctx, &handle)
+    let sink: Push = Socket::builder(Arc::clone(&ctx))
+        .connect("tcp://localhost:5558")
+        .try_into()
+        .unwrap();
+    let sink2: Push = Socket::builder(ctx)
         .connect("tcp://localhost:5558")
         .try_into()
         .unwrap();
@@ -76,7 +86,7 @@ fn main() {
     let start_msg = zmq::Message::from_slice(b"START").unwrap().into();
     let stop_msg = zmq::Message::from_slice(b"STOP").unwrap().into();
 
-    let interval = Interval::new(Duration::from_millis(200), &core.handle()).unwrap();
+    let interval = Timer::default().interval(Duration::from_millis(200));
 
     let process = sink.send(start_msg).map_err(Error::from).and_then(|_| {
         iter_ok(0..10)
@@ -91,9 +101,12 @@ fn main() {
 
                 Ok(msg.into())
             })
-            .forward(workers.sink::<Error>())
-            .and_then(move |_| sink.send(stop_msg).map_err(Error::from))
+            .forward(workers.sink())
+            .and_then(move |_| sink2.send(stop_msg).map_err(Error::from))
     });
 
-    core.run(process).unwrap();
+    tokio::runtime::run2(process.map(|_| ()).or_else(|e| {
+        println!("Error: {:?}", e);
+        Ok(())
+    }));
 }

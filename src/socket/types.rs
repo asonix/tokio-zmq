@@ -21,18 +21,21 @@
 
 use std::convert::TryFrom;
 
+use tokio::reactor::PollEvented2;
+use tokio_file_unix::File;
 use zmq;
 
+use error::Error;
+use file::ZmqFile;
 use socket::config::{PairConfig, SockConfig, SubConfig};
 use socket::Socket;
-use error::Error;
 
 /* -------------------------------------------------------------------------- */
 
 /// The DEALER `SocketType` wrapper type.
 ///
 /// Dealer implements `StreamSocket` and `SinkSocket`, and has an associated controlled variant.
-#[derive(Clone, SocketWrapper)]
+#[derive(SocketWrapper)]
 #[stream]
 #[sink]
 pub struct Dealer {
@@ -44,7 +47,7 @@ pub struct Dealer {
 /// The PAIR `SocketType` wrapper type.
 ///
 /// Pair implements `StreamSocket` and `SinkSocket`, and has an associated controlled variant.
-#[derive(Clone, SocketWrapper)]
+#[derive(SocketWrapper)]
 #[stream]
 #[sink]
 #[try_from = "PairConfig"]
@@ -57,7 +60,7 @@ pub struct Pair {
 /// The PUB `SocketType` wrapper type
 ///
 /// Pub implements `SinkSocket`.
-#[derive(Clone, SocketWrapper)]
+#[derive(SocketWrapper)]
 #[sink]
 pub struct Pub {
     inner: Socket,
@@ -68,7 +71,7 @@ pub struct Pub {
 /// The PULL `SocketType` wrapper type
 ///
 /// Pull implements `StreamSocket`, and has an associated controlled variant.
-#[derive(Clone, SocketWrapper)]
+#[derive(SocketWrapper)]
 #[stream]
 pub struct Pull {
     inner: Socket,
@@ -79,7 +82,7 @@ pub struct Pull {
 /// The PUSH `SocketType` wrapper type
 ///
 /// Push implements `SinkSocket`.
-#[derive(Clone, SocketWrapper)]
+#[derive(SocketWrapper)]
 #[sink]
 pub struct Push {
     inner: Socket,
@@ -90,7 +93,7 @@ pub struct Push {
 /// The REP `SocketType` wrapper type
 ///
 /// Rep implements `StreamSocket` and `SinkSocket`, and has an associated controlled variant.
-#[derive(Clone, SocketWrapper)]
+#[derive(SocketWrapper)]
 #[stream]
 #[sink]
 pub struct Rep {
@@ -102,7 +105,7 @@ pub struct Rep {
 /// The REQ `SocketType` wrapper type
 ///
 /// Req implements `StreamSocket` and `SinkSocket`, and has an associated controlled variant.
-#[derive(Clone, SocketWrapper)]
+#[derive(SocketWrapper)]
 #[stream]
 #[sink]
 pub struct Req {
@@ -114,7 +117,7 @@ pub struct Req {
 /// The ROUTER `SocketType` wrapper type
 ///
 /// Router implements `StreamSocket` and `SinkSocket`, and has an associated controlled variant.
-#[derive(Clone, SocketWrapper)]
+#[derive(SocketWrapper)]
 #[stream]
 #[sink]
 pub struct Router {
@@ -126,7 +129,7 @@ pub struct Router {
 /// The SUB `SocketType` wrapper type
 ///
 /// Sub implements `StreamSocket`, and has an associated controlled variant.
-#[derive(Clone, SocketWrapper)]
+#[derive(SocketWrapper)]
 #[stream]
 #[try_from = "SubConfig"]
 pub struct Sub {
@@ -138,7 +141,7 @@ pub struct Sub {
 /// The XPUB `SocketType` wrapper type
 ///
 /// Xpub implements `StreamSocket` and `SinkSocket`, and has an associated controlled variant.
-#[derive(Clone, SocketWrapper)]
+#[derive(SocketWrapper)]
 #[stream]
 #[sink]
 pub struct Xpub {
@@ -150,7 +153,7 @@ pub struct Xpub {
 /// The XSUB `SocketType` wrapper type
 ///
 /// Xsub implements `StreamSocket` and `SinkSocket`, and has an associated controlled variant.
-#[derive(Clone, SocketWrapper)]
+#[derive(SocketWrapper)]
 #[stream]
 #[sink]
 pub struct Xsub {

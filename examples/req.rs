@@ -22,52 +22,58 @@
 extern crate env_logger;
 extern crate futures;
 extern crate log;
-extern crate tokio_core;
+extern crate tokio;
 extern crate tokio_zmq;
 extern crate zmq;
 
-use std::rc::Rc;
+use std::sync::Arc;
 use std::convert::TryInto;
 
-use futures::{Future, Stream};
+use futures::{FutureExt, StreamExt};
 use futures::stream::iter_ok;
-use tokio_core::reactor::Core;
 use tokio_zmq::prelude::*;
 use tokio_zmq::{Multipart, Req, Socket};
+
+fn build_multipart(i: usize) -> Multipart {
+    let mut multipart = Multipart::new();
+
+    let msg1 = zmq::Message::from_slice(format!("Hewwo? {}", i).as_bytes()).unwrap();
+    let msg2 = zmq::Message::from_slice(format!("Mr Obama??? {}", i).as_bytes()).unwrap();
+
+    multipart.push_back(msg1);
+    multipart.push_back(msg2);
+    multipart
+}
 
 fn main() {
     env_logger::init().unwrap();
 
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-    let ctx = Rc::new(zmq::Context::new());
-    let req: Req = Socket::builder(ctx, &handle)
+    let ctx = Arc::new(zmq::Context::new());
+    let req: Req = Socket::builder(ctx)
         .connect("tcp://localhost:5560")
         .try_into()
         .unwrap();
 
-    let runner = iter_ok(0..10_000)
-        .and_then(|i| {
-            let mut multipart = Multipart::new();
+    let socket = req.socket();
 
-            let msg1 = zmq::Message::from_slice(format!("Hewwo? {}", i).as_bytes()).unwrap();
-            let msg2 = zmq::Message::from_slice(format!("Mr Obama??? {}", i).as_bytes()).unwrap();
+    let runner = socket.send(build_multipart(0)).and_then(|(sock, file)| {
+        let (sink, stream) = Socket::from_sock_and_file(sock, file).sink_stream().split();
 
-            multipart.push_back(msg1);
-            multipart.push_back(msg2);
-
-            let resp = req.recv();
-            req.send(multipart).and_then(|_| resp)
-        })
-        .and_then(|multipart| {
-            for msg in multipart {
-                if let Some(msg) = msg.as_str() {
-                    println!("Received: {}", msg);
+        stream
+            .zip(iter_ok(1..10_000))
+            .map(|(multipart, i)| {
+                for msg in multipart {
+                    if let Some(msg) = msg.as_str() {
+                        println!("Received: {}", msg);
+                    }
                 }
-            }
-            Ok(())
-        })
-        .for_each(|_| Ok(()));
+                build_multipart(i)
+            })
+            .forward(sink)
+    });
 
-    core.run(runner).unwrap();
+    tokio::runtime::run2(runner.map(|_| ()).or_else(|e| {
+        println!("Error: {:?}", e);
+        Ok(())
+    }));
 }

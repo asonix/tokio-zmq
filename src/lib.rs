@@ -44,33 +44,27 @@
 //!
 //! extern crate zmq;
 //! extern crate futures;
-//! extern crate tokio_core;
+//! extern crate tokio;
 //! extern crate tokio_zmq;
 //!
 //! use std::convert::TryInto;
-//! use std::rc::Rc;
+//! use std::sync::Arc;
 //!
-//! use futures::Stream;
-//! use tokio_core::reactor::Core;
+//! use futures::{FutureExt, StreamExt};
 //! use tokio_zmq::prelude::*;
 //! use tokio_zmq::{Socket, Pub, Sub, Error};
 //!
 //! fn run() -> Result<(), Error> {
-//!     // Create a new Event Loop. Typically this will happen somewhere near the start of your
-//!     // application.
-//!     let mut core = Core::new()?;
-//!     let handle = core.handle();
-//!
 //!     // Create a new ZeroMQ Context. This context will be used to create all the sockets.
-//!     let context = Rc::new(zmq::Context::new());
+//!     let context = Arc::new(zmq::Context::new());
 //!
 //!     // Create our two sockets using the Socket builder pattern.
 //!     // Note that the variable is named zpub, since pub is a keyword
-//!     let zpub: Pub = Socket::builder(Rc::clone(&context), &handle)
+//!     let zpub: Pub = Socket::builder(Arc::clone(&context))
 //!         .bind("tcp://*:5561")
 //!         .try_into()?;
 //!
-//!     let sub: Sub = Socket::builder(context, &handle)
+//!     let sub: Sub = Socket::builder(context)
 //!         .bind("tcp://*:5562")
 //!         .filter(b"")
 //!         .try_into()?;
@@ -86,10 +80,12 @@
 //!             }
 //!             multipart
 //!         })
-//!         .forward(zpub.sink::<Error>());
+//!         .forward(zpub.sink());
 //!
 //!     // To avoid an infinte doctest, the actual core.run is commented out.
-//!     // core.run(runner)?;
+//!     // tokio::runtime::run2(runner.map(|_| ()).or_else(|e| {
+//!     //     println!("Error: {}", e);
+//!     // })?;
 //!     # let _ = runner;
 //!     # Ok(())
 //! }
@@ -102,9 +98,10 @@
 extern crate futures;
 #[macro_use]
 extern crate log;
-extern crate tokio_core;
+extern crate mio;
+extern crate tokio;
 extern crate tokio_file_unix;
-extern crate tokio_timer;
+extern crate tokio_timer_futures2 as tokio_timer;
 #[macro_use]
 extern crate tokio_zmq_derive;
 extern crate zmq;

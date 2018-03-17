@@ -20,17 +20,18 @@
 #![feature(try_from)]
 
 extern crate futures;
-extern crate tokio_core;
+extern crate tokio;
+extern crate tokio_timer_futures2 as tokio_timer;
 extern crate tokio_zmq;
 extern crate zmq;
 
-use std::io;
-use std::rc::Rc;
-use std::time::Duration;
 use std::convert::TryInto;
+use std::io;
+use std::sync::Arc;
+use std::time::Duration;
 
-use futures::Stream;
-use tokio_core::reactor::{Core, Interval};
+use futures::{FutureExt, StreamExt};
+use tokio_timer::{Timer, TimerError};
 use tokio_zmq::prelude::*;
 use tokio_zmq::{Error as ZmqFutError, Pub, Socket};
 
@@ -39,6 +40,7 @@ enum Error {
     ZmqFut(ZmqFutError),
     Zmq(zmq::Error),
     Io(io::Error),
+    Timer(TimerError),
 }
 
 impl From<ZmqFutError> for Error {
@@ -59,17 +61,21 @@ impl From<io::Error> for Error {
     }
 }
 
+impl From<TimerError> for Error {
+    fn from(e: TimerError) -> Self {
+        Error::Timer(e)
+    }
+}
+
 fn main() {
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-    let ctx = Rc::new(zmq::Context::new());
-    let zpub: Pub = Socket::builder(ctx, &handle)
+    let ctx = Arc::new(zmq::Context::new());
+    let zpub: Pub = Socket::builder(ctx)
         .bind("tcp://*:5556")
         .try_into()
         .unwrap();
 
-    let producer = Interval::new(Duration::from_secs(1), &handle)
-        .unwrap()
+    let producer = Timer::default()
+        .interval(Duration::from_secs(1))
         .map_err(Error::from)
         .and_then(|_| {
             println!("Sending 'Hello'");
@@ -77,7 +83,10 @@ fn main() {
                 .map_err(Error::from)
                 .map(|msg| msg.into())
         })
-        .forward(zpub.sink::<Error>());
+        .forward(zpub.sink());
 
-    core.run(producer).unwrap();
+    tokio::runtime::run2(producer.map(|_| ()).or_else(|e| {
+        println!("Error in producer: {:?}", e);
+        Ok(())
+    }));
 }

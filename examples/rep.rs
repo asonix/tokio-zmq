@@ -22,30 +22,29 @@
 extern crate env_logger;
 extern crate futures;
 extern crate log;
-extern crate tokio_core;
+extern crate tokio;
 extern crate tokio_zmq;
 extern crate zmq;
 
-use std::rc::Rc;
+use std::sync::Arc;
 use std::convert::TryInto;
 
-use futures::Stream;
-use tokio_core::reactor::Core;
+use futures::{FutureExt, StreamExt};
 use tokio_zmq::prelude::*;
-use tokio_zmq::{Error, Rep, Socket};
+use tokio_zmq::{Rep, Socket};
 
 fn main() {
     env_logger::init().unwrap();
 
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-    let ctx = Rc::new(zmq::Context::new());
-    let rep: Rep = Socket::builder(ctx, &handle)
+    let ctx = Arc::new(zmq::Context::new());
+    let rep: Rep = Socket::builder(ctx)
         .bind("tcp://*:5560")
         .try_into()
         .unwrap();
 
-    let runner = rep.stream()
+    let (sink, stream) = rep.sink_stream().split();
+
+    let runner = stream
         .map(|multipart| {
             for msg in &multipart {
                 if let Some(s) = msg.as_str() {
@@ -54,7 +53,10 @@ fn main() {
             }
             multipart
         })
-        .forward(rep.sink::<Error>());
+        .forward(sink);
 
-    core.run(runner).unwrap();
+    tokio::runtime::run2(runner.map(|_| ()).or_else(|e| {
+        println!("Error: {:?}", e);
+        Ok(())
+    }));
 }

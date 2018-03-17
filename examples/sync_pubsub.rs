@@ -22,18 +22,17 @@
 extern crate env_logger;
 extern crate futures;
 extern crate log;
-extern crate tokio_core;
+extern crate tokio;
 extern crate tokio_zmq;
 extern crate zmq;
 
-use std::rc::Rc;
 use std::convert::TryInto;
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
 use futures::stream::iter_ok;
-use futures::{Future, Stream};
-use tokio_core::reactor::Core;
+use futures::{FutureExt, SinkExt, StreamExt};
 use tokio_zmq::prelude::*;
 use tokio_zmq::{Pub, Rep, Req, Sub};
 use tokio_zmq::{Error, Multipart, Socket};
@@ -62,69 +61,68 @@ impl EndHandler for Stop {
 }
 
 fn publisher_thread() {
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-    let ctx = Rc::new(zmq::Context::new());
+    let ctx = Arc::new(zmq::Context::new());
 
-    let publisher: Pub = Socket::builder(Rc::clone(&ctx), &handle)
+    let publisher: Pub = Socket::builder(Arc::clone(&ctx))
         .bind("tcp://*:5561")
         .try_into()
         .unwrap();
 
-    let syncservice: Rep = Socket::builder(ctx, &handle)
+    let syncservice: Rep = Socket::builder(ctx)
         .bind("tcp://*:5562")
         .try_into()
         .unwrap();
 
     println!("Waiting for subscribers");
 
+    let (sync_sink, sync_stream) = syncservice.sink_stream().split();
+
     let runner = iter_ok(0..SUBSCRIBERS)
-        .zip(syncservice.stream())
+        .zip(sync_stream)
         .map(|(_, _)| zmq::Message::from_slice(b"").unwrap().into())
-        .forward(syncservice.sink::<Error>())
-        .and_then(|_| {
+        .forward(sync_sink)
+        .and_then(move |_| {
             println!("Broadcasting message");
 
             iter_ok(0..MESSAGES)
                 .map(|_| zmq::Message::from_slice(b"Rhubarb").unwrap().into())
-                .forward(publisher.sink::<Error>())
+                .forward(publisher.sink())
         })
-        .and_then(|_| {
+        .and_then(|(_stream, sink)| {
             let msg = zmq::Message::from_slice(b"END").unwrap();
 
-            publisher.send(msg.into())
+            sink.send(msg.into())
         });
 
-    core.run(runner).unwrap();
+    tokio::runtime::run2(runner.map(|_| ()).or_else(|e| {
+        println!("Error in publisher: {:?}", e);
+        Ok(())
+    }));
 }
 
 fn subscriber_thread() {
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-    let ctx = Rc::new(zmq::Context::new());
+    let ctx = Arc::new(zmq::Context::new());
 
-    let subscriber: Sub = Socket::builder(Rc::clone(&ctx), &handle)
+    let subscriber: Sub = Socket::builder(Arc::clone(&ctx))
         .connect("tcp://localhost:5561")
         .filter(b"")
         .try_into()
         .unwrap();
 
-    let syncclient: Req = Socket::builder(ctx, &handle)
+    let syncclient: Req = Socket::builder(ctx)
         .connect("tcp://localhost:5562")
         .try_into()
         .unwrap();
 
     let msg = zmq::Message::from_slice(b"").unwrap();
 
-    let recv = syncclient.recv();
-
     let runner = syncclient
         .send(msg.into())
-        .and_then(move |_| recv)
-        .and_then(|_| {
+        .and_then(|syncclient| syncclient.recv())
+        .and_then(move |_| {
             subscriber
                 .stream()
-                .with_end(Stop)
+                .with_end_handler(Stop)
                 .fold(0, |counter, _| Ok(counter + 1) as Result<usize, Error>)
                 .and_then(|total| {
                     println!("Received {} updates", total);
@@ -132,7 +130,10 @@ fn subscriber_thread() {
                 })
         });
 
-    core.run(runner).unwrap();
+    tokio::runtime::run2(runner.map(|_| ()).or_else(|e| {
+        println!("Error in subscriber: {:?}", e);
+        Ok(())
+    }));
 }
 
 fn main() {
