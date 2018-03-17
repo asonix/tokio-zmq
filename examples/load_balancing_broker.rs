@@ -125,11 +125,11 @@ impl From<Envelope> for Multipart {
 
 /* -----------------------------------Stop----------------------------------- */
 
-struct Stop;
+struct Stop(&'static str, usize);
 
 impl ControlHandler for Stop {
     fn should_stop(&mut self, _: Multipart) -> bool {
-        println!("Received stop signal!");
+        println!("Received stop signal! {}/{}", self.0, self.1);
         true
     }
 }
@@ -188,7 +188,7 @@ fn worker_task(worker_num: usize) -> usize {
             let (sink, stream) = Socket::from_sock_and_file(sock, file).sink_stream().split();
 
             stream
-                .controlled(control.stream(), Stop)
+                .controlled(control.stream(), Stop("worker", worker_num))
                 .map_err(Error::from)
                 .and_then(|multipart| {
                     let mut envelope: Envelope = multipart.try_into()?;
@@ -225,7 +225,13 @@ fn broker_task() {
         .try_into()
         .unwrap();
 
-    let control: Sub = Socket::builder(Arc::clone(&context))
+    let control0: Sub = Socket::builder(Arc::clone(&context))
+        .connect("tcp://localhost:5674")
+        .filter(b"")
+        .try_into()
+        .unwrap();
+
+    let control1: Sub = Socket::builder(Arc::clone(&context))
         .connect("tcp://localhost:5674")
         .filter(b"")
         .try_into()
@@ -242,7 +248,7 @@ fn broker_task() {
     let (backend_sink, backend_stream) = backend.sink_stream().split();
 
     let back2front = backend_stream
-        .controlled(control.stream(), Stop)
+        .controlled(control0.stream(), Stop("broker", 0))
         .map_err(Error::from)
         .and_then(|mut multipart| {
             let worker_id = multipart.pop_front().ok_or(Error::NotEnoughMessages)?;
@@ -286,6 +292,7 @@ fn broker_task() {
         .forward(frontend_sink);
 
     let front2back = frontend_stream
+        .controlled(control1.stream(), Stop("broker", 1))
         .map_err(Error::from)
         .zip(worker_recv.map_err(|_| Error::WorkerRecv))
         .and_then(|(mut multipart, worker_id)| {
