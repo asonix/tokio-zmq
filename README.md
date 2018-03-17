@@ -1,4 +1,5 @@
 # Tokio ZMQ
+_This readme is for the 0.4.0 alpha, for the 0.3.1 readme, look [here](https://github.com/asonix/tokio-zmq/tree/0.3.x)_
 
 [documentation](https://docs.rs/tokio-zmq/)
 [crates.io](https://crates.io/crates/tokio-zmq)
