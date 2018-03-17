@@ -1,3 +1,25 @@
+/*
+ * This file is part of Tokio ZMQ.
+ *
+ * Copyright © 2017 Riley Trautman
+ *
+ * Tokio ZMQ is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Tokio ZMQ is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Tokio ZMQ.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+//! This module defines the `MultipartSinkStream` type. A wrapper around Sockets that implements
+//! `futures::Sink` and `futures::Stream`.
+
 use std::mem::swap;
 
 use futures::{Async, Sink, Stream};
@@ -12,6 +34,45 @@ use error::Error;
 use file::ZmqFile;
 use message::Multipart;
 
+/// The `MultipartSinkStream` handles sending and receiving streams of data to and from ZeroMQ
+/// Sockets.
+///
+/// You shouldn't ever need to manually create one. Here's how to get one from a 'raw' `Socket`'
+/// type.
+///
+/// ### Example
+/// ```rust
+/// #![feature(conservative_impl_trait)]
+///
+/// extern crate zmq;
+/// extern crate futures;
+/// extern crate tokio;
+/// extern crate tokio_zmq;
+///
+/// use std::sync::Arc;
+///
+/// use futures::{FutureExt, Sink, Stream, StreamExt};
+/// use tokio_zmq::{Error, Multipart, Socket};
+///
+/// fn get_sink_stream(socket: Socket) -> impl Sink<SinkItem = Multipart, SinkError = Error> + Stream<Item = Multipart, Error = Error>
+/// {
+///     socket.sink_stream()
+/// }
+///
+/// fn main() {
+///     let context = Arc::new(zmq::Context::new());
+///     let socket = Socket::builder(context)
+///         .bind("tcp://*:5575")
+///         .build(zmq::REP)
+///         .unwrap();
+///
+///     let sink_stream = get_sink_stream(socket);
+///
+///     let (sink, stream) = sink_stream.split();
+///
+///     // tokio::reactor::run2(stream.forward(sink));
+/// }
+/// ```
 pub struct MultipartSinkStream {
     inner: SinkStreamState,
 }

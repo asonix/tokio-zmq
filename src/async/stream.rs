@@ -45,13 +45,11 @@ use prelude::{ControlHandler, EndHandler};
 ///
 /// extern crate zmq;
 /// extern crate futures;
-/// extern crate tokio_core;
 /// extern crate tokio_zmq;
 ///
-/// use std::rc::Rc;
+/// use std::sync::Arc;
 ///
-/// use futures::Stream;
-/// use tokio_core::reactor::Core;
+/// use futures::{Stream, StreamExt};
 /// use tokio_zmq::async::MultipartStream;
 /// use tokio_zmq::{Error, Multipart, Socket};
 ///
@@ -63,9 +61,8 @@ use prelude::{ControlHandler, EndHandler};
 /// }
 ///
 /// fn main() {
-///     let core = Core::new().unwrap();
-///     let context = Rc::new(zmq::Context::new());
-///     let socket = Socket::builder(context, &core.handle())
+///     let context = Arc::new(zmq::Context::new());
+///     let socket = Socket::builder(context)
 ///         .connect("tcp://localhost:5568")
 ///         .filter(b"")
 ///         .build(zmq::SUB)

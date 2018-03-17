@@ -44,14 +44,12 @@ use message::Multipart;
 /// #
 /// # extern crate zmq;
 /// # extern crate futures;
-/// # extern crate tokio_core;
 /// # extern crate tokio_zmq;
 /// #
-/// # use std::rc::Rc;
 /// # use std::convert::TryInto;
+/// # use std::sync::Arc;
 /// #
-/// # use futures::Future;
-/// # use tokio_core::reactor::Core;
+/// # use futures::{Future, FutureExt};
 /// # use tokio_zmq::prelude::*;
 /// # use tokio_zmq::async::MultipartRequest;
 /// # use tokio_zmq::{Error, Rep, Socket};
@@ -60,17 +58,15 @@ use message::Multipart;
 /// #     get_sock();
 /// # }
 /// # fn get_sock() -> impl Future<Item = (), Error = Error> {
-/// #     let core = Core::new().unwrap();
-/// #     let ctx = Rc::new(zmq::Context::new());
-/// #     let rep: Rep = Socket::builder(ctx, &core.handle())
+/// #     let ctx = Arc::new(zmq::Context::new());
+/// #     let rep: Rep = Socket::builder(ctx)
 /// #         .bind("tcp://*:5567")
 /// #         .try_into()
 /// #         .unwrap();
 /// #     let socket = rep.socket();
-/// #     let sock = socket.inner_sock();
-/// #     let file = socket.inner_file();
+/// #     let (sock, file) = socket.inner();
 /// #     let msg = zmq::Message::from_slice(format!("Hey").as_bytes()).unwrap();
-/// MultipartRequest::new(sock, file, msg.into()).and_then(|_| {
+/// MultipartRequest::new(sock, file, msg.into()).and_then(|(_, _)| {
 ///     // succesfull request
 ///     # Ok(())
 /// })
@@ -257,14 +253,12 @@ where
 /// #
 /// # extern crate zmq;
 /// # extern crate futures;
-/// # extern crate tokio_core;
 /// # extern crate tokio_zmq;
 /// #
-/// # use std::rc::Rc;
 /// # use std::convert::TryInto;
+/// # use std::sync::Arc;
 /// #
-/// # use futures::Future;
-/// # use tokio_core::reactor::Core;
+/// # use futures::{Future, FutureExt};
 /// # use tokio_zmq::prelude::*;
 /// # use tokio_zmq::async::{MultipartResponse};
 /// # use tokio_zmq::{Error, Multipart, Rep, Socket};
@@ -273,16 +267,14 @@ where
 /// #     get_sock();
 /// # }
 /// # fn get_sock() -> impl Future<Item = Multipart, Error = Error> {
-/// #     let core = Core::new().unwrap();
-/// #     let ctx = Rc::new(zmq::Context::new());
-/// #     let rep: Rep = Socket::builder(ctx, &core.handle())
+/// #     let ctx = Arc::new(zmq::Context::new());
+/// #     let rep: Rep = Socket::builder(ctx)
 /// #         .bind("tcp://*:5567")
 /// #         .try_into()
 /// #         .unwrap();
 /// #     let socket = rep.socket();
-/// #     let sock = socket.inner_sock();
-/// #     let file = socket.inner_file();
-/// MultipartResponse::new(sock, file).and_then(|multipart| {
+/// #     let (sock, file) = socket.inner();
+/// MultipartResponse::new(sock, file).and_then(|(multipart, (_, _))| {
 ///     // handle multipart response
 ///     # Ok(multipart)
 /// })

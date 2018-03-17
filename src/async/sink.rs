@@ -18,7 +18,7 @@
  */
 
 //! This module defines the `MultipartSink` type. A wrapper around Sockets that implements
-//! `futures::Stream`.
+//! `futures::Sink`.
 
 use std::mem::swap;
 
@@ -44,14 +44,12 @@ use file::ZmqFile;
 ///
 /// extern crate zmq;
 /// extern crate futures;
-/// extern crate tokio_core;
+/// extern crate tokio;
 /// extern crate tokio_zmq;
 ///
-/// use std::rc::Rc;
+/// use std::sync::Arc;
 ///
-/// use futures::{Future, Sink};
-/// use tokio_core::reactor::Core;
-/// use tokio_zmq::async::{MultipartStream};
+/// use futures::{FutureExt, Sink, SinkExt};
 /// use tokio_zmq::{Error, Multipart, Socket};
 ///
 /// fn get_sink(socket: Socket) -> impl Sink<SinkItem = Multipart, SinkError = Error> {
@@ -59,17 +57,16 @@ use file::ZmqFile;
 /// }
 ///
 /// fn main() {
-///     let mut core = Core::new().unwrap();
-///     let context = Rc::new(zmq::Context::new());
-///     let socket = Socket::builder(context, &core.handle())
+///     let context = Arc::new(zmq::Context::new());
+///     let socket = Socket::builder(context)
 ///         .bind("tcp://*:5568")
 ///         .build(zmq::PUB)
 ///         .unwrap();
 ///     let sink = get_sink(socket);
 ///
-///     let msg = zmq::Message::from_slice(b"Some message").unwrap();
+///     let msg = zmq::Message::from_slice(b"Some message");
 ///
-///     core.run(sink.send(msg.into())).unwrap();
+///     // tokio::reactor::run2(sink.send(msg.into())).unwrap();
 /// }
 /// ```
 pub struct MultipartSink {

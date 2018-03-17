@@ -75,29 +75,27 @@ pub trait StreamSocket: AsSocket {
     /// ```rust
     /// #![feature(try_from)]
     ///
-    /// extern crate zmq;
     /// extern crate futures;
-    /// extern crate tokio_core;
+    /// extern crate tokio;
     /// extern crate tokio_zmq;
+    /// extern crate zmq;
     ///
-    /// use std::rc::Rc;
     /// use std::convert::TryInto;
+    /// use std::sync::Arc;
     ///
-    /// use futures::Future;
-    /// use tokio_core::reactor::Core;
+    /// use futures::FutureExt;
     /// use tokio_zmq::prelude::*;
     /// use tokio_zmq::async::MultipartStream;
     /// use tokio_zmq::{Error, Multipart, Rep, Socket};
     ///
     /// fn main() {
-    ///     let core = Core::new().unwrap();
-    ///     let context = Rc::new(zmq::Context::new());
-    ///     let rep: Rep = Socket::builder(context, &core.handle())
+    ///     let context = Arc::new(zmq::Context::new());
+    ///     let rep: Rep = Socket::builder(context)
     ///         .connect("tcp://localhost:5568")
     ///         .try_into()
     ///         .unwrap();
     ///
-    ///     let fut = rep.recv().and_then(|multipart| {
+    ///     let fut = rep.recv().and_then(|(multipart, _)| {
     ///         for msg in &multipart {
     ///             if let Some(msg) = msg.as_str() {
     ///                 println!("Message: {}", msg);
@@ -106,9 +104,13 @@ pub trait StreamSocket: AsSocket {
     ///         Ok(multipart)
     ///     });
     ///
-    ///     // core.run(fut).unwrap();
+    ///     // tokio::runtime::run2(fut.map(|_| ()).or_else(|e| {
+    ///     //     println!("Error: {}", e);
+    ///     //     Ok(())
+    ///     // }));
     ///     # let _ = fut;
     /// }
+    /// ```
     fn recv(self) -> MultipartResponse<Self> {
         self.socket().recv()
     }
@@ -121,22 +123,20 @@ pub trait StreamSocket: AsSocket {
     ///
     /// extern crate zmq;
     /// extern crate futures;
-    /// extern crate tokio_core;
+    /// extern crate tokio;
     /// extern crate tokio_zmq;
     ///
-    /// use std::rc::Rc;
     /// use std::convert::TryInto;
+    /// use std::sync::Arc;
     ///
-    /// use futures::Stream;
-    /// use tokio_core::reactor::Core;
+    /// use futures::{FutureExt, StreamExt};
     /// use tokio_zmq::prelude::*;
     /// use tokio_zmq::async::{MultipartStream};
     /// use tokio_zmq::{Error, Multipart, Socket, Sub};
     ///
     /// fn main() {
-    ///     let core = Core::new().unwrap();
-    ///     let context = Rc::new(zmq::Context::new());
-    ///     let sub: Sub = Socket::builder(context, &core.handle())
+    ///     let context = Arc::new(zmq::Context::new());
+    ///     let sub: Sub = Socket::builder(context)
     ///         .connect("tcp://localhost:5569")
     ///         .filter(b"")
     ///         .try_into()
@@ -151,9 +151,12 @@ pub trait StreamSocket: AsSocket {
     ///         Ok(())
     ///     });
     ///
-    ///     // core.run(fut).unwrap();
-    ///     # let _ = fut;
+    ///     // tokio::runtime::run2(fut.map(|_| ()).or_else(|e| {
+    ///     //     println!("Error: {}", e);
+    ///     //     Ok(())
+    ///     // }));
     /// }
+    /// ```
     fn stream(self) -> MultipartStream {
         self.socket().stream()
     }
@@ -170,21 +173,20 @@ pub trait SinkSocket: AsSocket {
     ///
     /// extern crate zmq;
     /// extern crate futures;
-    /// extern crate tokio_core;
+    /// extern crate tokio;
     /// extern crate tokio_zmq;
     ///
-    /// use std::rc::Rc;
     /// use std::convert::TryInto;
+    /// use std::sync::Arc;
     ///
-    /// use tokio_core::reactor::Core;
+    /// use futures::FutureExt;
     /// use tokio_zmq::prelude::*;
     /// use tokio_zmq::async::MultipartStream;
     /// use tokio_zmq::{Error, Pub, Socket};
     ///
     /// fn main() {
-    ///     let mut core = Core::new().unwrap();
-    ///     let context = Rc::new(zmq::Context::new());
-    ///     let zpub: Pub = Socket::builder(context, &core.handle())
+    ///     let context = Arc::new(zmq::Context::new());
+    ///     let zpub: Pub = Socket::builder(context)
     ///         .connect("tcp://localhost:5569")
     ///         .try_into()
     ///         .unwrap();
@@ -193,8 +195,12 @@ pub trait SinkSocket: AsSocket {
     ///
     ///     let fut = zpub.send(msg.into());
     ///
-    ///     core.run(fut).unwrap();
+    ///     // tokio::runtime::run2(fut.map(|_| ()).or_else(|e| {
+    ///     //     println!("Error: {}", e);
+    ///     //     Ok(())
+    ///     // }));
     /// }
+    /// ```
     fn send(self, multipart: Multipart) -> MultipartRequest<Self> {
         self.socket().send(multipart)
     }
@@ -207,23 +213,21 @@ pub trait SinkSocket: AsSocket {
     ///
     /// extern crate zmq;
     /// extern crate futures;
-    /// extern crate tokio_core;
+    /// extern crate tokio;
     /// extern crate tokio_zmq;
     ///
-    /// use std::rc::Rc;
     /// use std::convert::TryInto;
+    /// use std::sync::Arc;
     ///
-    /// use futures::Stream;
+    /// use futures::{FutureExt, StreamExt};
     /// use futures::stream::iter_ok;
-    /// use tokio_core::reactor::Core;
     /// use tokio_zmq::prelude::*;
     /// use tokio_zmq::async::MultipartStream;
     /// use tokio_zmq::{Error, Multipart, Pub, Socket};
     ///
     /// fn main() {
-    ///     let mut core = Core::new().unwrap();
-    ///     let context = Rc::new(zmq::Context::new());
-    ///     let zpub: Pub = Socket::builder(context, &core.handle())
+    ///     let context = Arc::new(zmq::Context::new());
+    ///     let zpub: Pub = Socket::builder(context)
     ///         .connect("tcp://localhost:5570")
     ///         .try_into()
     ///         .unwrap();
@@ -233,33 +237,200 @@ pub trait SinkSocket: AsSocket {
     ///             let msg = zmq::Message::from_slice(format!("i: {}", i).as_bytes())?;
     ///             Ok(msg.into()) as Result<Multipart, Error>
     ///         })
-    ///         .forward(zpub.sink::<Error>());
+    ///         .forward(zpub.sink());
     ///
-    ///     core.run(fut).unwrap();
+    ///     // tokio::runtime::run2(fut.map(|_| ()).or_else(|e| {
+    ///     //     println!("Error: {}", e);
+    ///     //     Ok(())
+    ///     // }));
     /// }
+    /// ```
     fn sink(self) -> MultipartSink {
         self.socket().sink()
     }
 }
 
+/// This trait is provided for sockets that implement both Sync and Stream
 pub trait SinkStreamSocket: AsSocket {
+    /// Retrieve a structure that implements both Sync and Stream.
+    ///
+    /// ### Example, using a Rep wrapper type
+    /// ```rust
+    /// #![feature(try_from)]
+    ///
+    /// extern crate futures;
+    /// extern crate tokio_zmq;
+    /// extern crate zmq;
+    ///
+    /// use std::convert::TryInto;
+    /// use std::sync::Arc;
+    ///
+    /// use futures::{FutureExt, StreamExt};
+    /// use tokio_zmq::prelude::*;
+    /// use tokio_zmq::{Socket, Rep};
+    ///
+    /// fn main() {
+    ///     let ctx = Arc::new(zmq::Context::new());
+    ///     let rep: Rep = Socket::builder(ctx)
+    ///         .bind("tcp://*:5571")
+    ///         .try_into()
+    ///         .unwrap();
+    ///
+    ///     let (sink, stream) = rep.sink_stream().split();
+    ///
+    ///     let fut = stream.forward(sink);
+    ///
+    ///     // tokio::reactor::run2(fut.map(|_| ()).or_else(|e| {
+    ///     //     println!("Error: {}", e);
+    ///     //     Ok(())
+    ///     // }));
+    /// }
+    /// ```
     fn sink_stream(self) -> MultipartSinkStream;
 }
 
+/// This trait is provided to allow for ending a stream based on a Multipart message it receives.
 pub trait WithEndHandler: Stream<Item = Multipart, Error = Error> + Sized {
+    /// Add an EndHandler to a stream.
+    ///
+    /// ### Example, using a Sub wrapper type
+    /// ```rust
+    /// #![feature(try_from)]
+    ///
+    /// extern crate futures;
+    /// extern crate tokio_zmq;
+    /// extern crate zmq;
+    ///
+    /// use std::convert::TryInto;
+    /// use std::sync::Arc;
+    ///
+    /// use futures::{FutureExt, StreamExt};
+    /// use tokio_zmq::prelude::*;
+    /// use tokio_zmq::{Socket, Sub, Multipart};
+    ///
+    /// struct End(u32);
+    ///
+    /// impl EndHandler for End {
+    ///     fn should_stop(&mut self, multipart: &Multipart) -> bool {
+    ///         self.0 += 1;
+    ///
+    ///         self.0 > 30
+    ///     }
+    /// }
+    ///
+    /// fn main() {
+    ///     let ctx = Arc::new(zmq::Context::new());
+    ///     let sub: Sub = Socket::builder(ctx)
+    ///         .bind("tcp://*:5571")
+    ///         .filter(b"")
+    ///         .try_into()
+    ///         .unwrap();
+    ///
+    ///     let fut = sub.stream().with_end_handler(End(0));
+    ///
+    ///     // tokio::reactor::run2(fut.map(|_| ()).or_else(|e| {
+    ///     //     println!("Error: {}", e);
+    ///     //     Ok(())
+    ///     // }));
+    /// }
+    /// ```
     fn with_end_handler<E>(self, end_handler: E) -> EndingStream<E, Self>
     where
         E: EndHandler;
 }
 
+/// This trait is implemented by all Streams with Item = Multipart and Error = Error, it provides
+/// the ability to control when the stream stops based on the content of another stream.
 pub trait Controllable: Stream<Item = Multipart, Error = Error> + Sized {
+    /// Add a controller stream to a given stream. This allows the controller stream to decide when
+    /// the controlled stream should stop.
+    ///
+    /// ### Example, using a controlled Pull wrapper type and a controller Sub wrapper type
+    /// ```rust
+    /// #![feature(try_from)]
+    ///
+    /// extern crate futures;
+    /// extern crate tokio_zmq;
+    /// extern crate zmq;
+    ///
+    /// use std::convert::TryInto;
+    /// use std::sync::Arc;
+    ///
+    /// use futures::{FutureExt, StreamExt};
+    /// use tokio_zmq::prelude::*;
+    /// use tokio_zmq::{Socket, Pull, Sub, Multipart};
+    ///
+    /// struct End;
+    ///
+    /// impl ControlHandler for End {
+    ///     fn should_stop(&mut self, _: Multipart) -> bool {
+    ///         true
+    ///     }
+    /// }
+    ///
+    /// fn main() {
+    ///     let ctx = Arc::new(zmq::Context::new());
+    ///     let pull: Pull = Socket::builder(Arc::clone(&ctx))
+    ///         .bind("tcp://*:5572")
+    ///         .try_into()
+    ///         .unwrap();
+    ///
+    ///     let sub: Sub = Socket::builder(ctx)
+    ///         .bind("tcp://*:5573")
+    ///         .filter(b"")
+    ///         .try_into()
+    ///         .unwrap();
+    ///
+    ///     let fut = pull.stream().controlled(sub.stream(), End);
+    ///
+    ///     // tokio::reactor::run2(fut.map(|_| ()).or_else(|e| {
+    ///     //     println!("Error: {}", e);
+    ///     //     Ok(())
+    ///     // }));
+    /// }
+    /// ```
     fn controlled<H, S>(self, control_stream: S, handler: H) -> ControlledStream<H, S, Self>
     where
         H: ControlHandler,
         S: Stream<Item = Multipart, Error = Error>;
 }
 
+/// This trait allows adding a timeout to any stream with Error = Error.
 pub trait WithTimeout: Stream<Error = Error> + Sized {
+    /// Add a timeout to a given stream.
+    ///
+    /// ### Example, using a Pull wrapper type
+    /// ```rust
+    /// #![feature(try_from)]
+    ///
+    /// extern crate futures;
+    /// extern crate tokio_zmq;
+    /// extern crate zmq;
+    ///
+    /// use std::convert::TryInto;
+    /// use std::sync::Arc;
+    /// use std::time::Duration;
+    ///
+    /// use futures::{FutureExt, StreamExt};
+    /// use tokio_zmq::prelude::*;
+    /// use tokio_zmq::{Socket, Pull, Multipart};
+    ///
+    /// fn main() {
+    ///     let ctx = Arc::new(zmq::Context::new());
+    ///     let pull: Pull = Socket::builder(ctx)
+    ///         .bind("tcp://*:5574")
+    ///         .try_into()
+    ///         .unwrap();
+    ///
+    ///     // Receive a Timeout after 30 seconds if the stream hasn't produced a value
+    ///     let fut = pull.stream().timeout(Duration::from_secs(30));
+    ///
+    ///     // tokio::reactor::run2(fut.map(|_| ()).or_else(|e| {
+    ///     //     println!("Error: {}", e);
+    ///     //     Ok(())
+    ///     // }));
+    /// }
+    /// ```
     fn timeout(self, duration: Duration) -> TimeoutStream<Self>;
 }
 
