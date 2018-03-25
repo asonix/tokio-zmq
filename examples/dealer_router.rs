@@ -20,7 +20,7 @@
 #![feature(try_from)]
 
 extern crate env_logger;
-extern crate futures;
+extern crate futures_util;
 extern crate log;
 extern crate tokio;
 extern crate tokio_executor;
@@ -32,8 +32,8 @@ use std::env;
 use std::sync::Arc;
 use std::thread;
 
-use futures::stream::iter_ok;
-use futures::{FutureExt, StreamExt};
+use futures_util::stream::iter_ok;
+use futures_util::{FutureExt, StreamExt};
 use tokio_zmq::prelude::*;
 use tokio_zmq::{Dealer, Pub, Rep, Req, Router, Sub};
 use tokio_zmq::{Multipart, Socket};
@@ -82,7 +82,7 @@ fn client() {
         })
         .and_then(move |(stream, _sink)| {
             stream
-                .into_future()
+                .next()
                 .map_err(|(e, _)| e)
                 .and_then(|(maybe_last_item, _stream)| {
                     if let Some(multipart) = maybe_last_item {

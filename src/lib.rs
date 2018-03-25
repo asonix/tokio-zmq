@@ -43,14 +43,14 @@
 //! #![feature(try_from)]
 //!
 //! extern crate zmq;
-//! extern crate futures;
+//! extern crate futures_util;
 //! extern crate tokio;
 //! extern crate tokio_zmq;
 //!
 //! use std::convert::TryInto;
 //! use std::sync::Arc;
 //!
-//! use futures::{FutureExt, StreamExt};
+//! use futures_util::{FutureExt, StreamExt};
 //! use tokio_zmq::prelude::*;
 //! use tokio_zmq::{Socket, Pub, Sub, Error};
 //!
@@ -95,7 +95,9 @@
 //! # }
 //! ```
 
-extern crate futures;
+extern crate futures_core;
+extern crate futures_sink;
+extern crate futures_util;
 #[macro_use]
 extern crate log;
 extern crate mio;

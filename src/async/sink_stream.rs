@@ -22,8 +22,9 @@
 
 use std::mem::swap;
 
-use futures::{Async, Sink, Stream};
-use futures::task::Context;
+use futures_core::{Async, Stream};
+use futures_core::task::Context;
+use futures_sink::Sink;
 use tokio_file_unix::File;
 use tokio::reactor::PollEvented2;
 use zmq;
@@ -45,13 +46,17 @@ use message::Multipart;
 /// #![feature(conservative_impl_trait)]
 ///
 /// extern crate zmq;
-/// extern crate futures;
+/// extern crate futures_core;
+/// extern crate futures_sink;
+/// extern crate futures_util;
 /// extern crate tokio;
 /// extern crate tokio_zmq;
 ///
 /// use std::sync::Arc;
 ///
-/// use futures::{FutureExt, Sink, Stream, StreamExt};
+/// use futures_sink::Sink;
+/// use futures_core::Stream;
+/// use futures_util::{FutureExt, StreamExt};
 /// use tokio_zmq::{Error, Multipart, Socket};
 ///
 /// fn get_sink_stream(socket: Socket) -> impl Sink<SinkItem = Multipart, SinkError = Error> + Stream<Item = Multipart, Error = Error>

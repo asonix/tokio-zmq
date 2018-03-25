@@ -1,5 +1,5 @@
 # Tokio ZMQ
-_This readme is for the 0.4.0 alpha, for the 0.3.1 readme, look [here](https://github.com/asonix/tokio-zmq/tree/0.3.x)_
+_This readme is for the 0.4.0 beta, for the 0.3.1 readme, look [here](https://github.com/asonix/tokio-zmq/tree/0.3.x)_
 
 [documentation](https://docs.rs/tokio-zmq/)
 [crates.io](https://crates.io/crates/tokio-zmq)
@@ -26,8 +26,8 @@ See the [examples folder](https://github.com/asonix/zmq-futures/tree/master/exam
 Add the following to your Cargo.toml
 ```toml
 zmq = "0.8"
-tokio-zmq = "0.4.0-alpha"
-futures = "0.2.0-alpha"
+tokio-zmq = "0.4.0-beta"
+futures = "0.2.0-beta"
 tokio = "0.1"
 ```
 

@@ -1,25 +1,25 @@
 /*
- * This file is part of ZeroMQ Futures.
+ * This file is part of Tokio ZMQ.
  *
  * Copyright © 2017 Riley Trautman
  *
- * ZeroMQ Futures is free software: you can redistribute it and/or modify
+ * Tokio ZMQ is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * ZeroMQ Futures is distributed in the hope that it will be useful,
+ * Tokio ZMQ is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with ZeroMQ Futures.  If not, see <http://www.gnu.org/licenses/>.
+ * along with Tokio ZMQ.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #![feature(try_from)]
 
-extern crate futures;
+extern crate futures_util;
 extern crate tokio;
 extern crate tokio_timer_futures2 as tokio_timer;
 extern crate tokio_zmq;
@@ -30,8 +30,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::convert::TryInto;
 
-use futures::{FutureExt, StreamExt};
-use futures::stream::iter_ok;
+use futures_util::{FutureExt, StreamExt};
+use futures_util::stream::iter_ok;
 use tokio_timer::{Timer, TimerError};
 use tokio_zmq::prelude::*;
 use tokio_zmq::{Error as ZmqFutError, Push, Socket};

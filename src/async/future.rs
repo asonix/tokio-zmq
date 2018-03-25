@@ -22,8 +22,8 @@
 
 use std::marker::PhantomData;
 
-use futures::{Async, Future};
-use futures::task::Context;
+use futures_core::{Async, Future};
+use futures_core::task::Context;
 use mio::Ready;
 use tokio::reactor::PollEvented2;
 use tokio_file_unix::File;
@@ -43,13 +43,15 @@ use message::Multipart;
 /// # #![feature(try_from)]
 /// #
 /// # extern crate zmq;
-/// # extern crate futures;
+/// # extern crate futures_core;
+/// # extern crate futures_util;
 /// # extern crate tokio_zmq;
 /// #
 /// # use std::convert::TryInto;
 /// # use std::sync::Arc;
 /// #
-/// # use futures::{Future, FutureExt};
+/// # use futures_core::Future;
+/// # use futures_util::FutureExt;
 /// # use tokio_zmq::prelude::*;
 /// # use tokio_zmq::async::MultipartRequest;
 /// # use tokio_zmq::{Error, Rep, Socket};
@@ -252,13 +254,15 @@ where
 /// # #![feature(try_from)]
 /// #
 /// # extern crate zmq;
-/// # extern crate futures;
+/// # extern crate futures_core;
+/// # extern crate futures_util;
 /// # extern crate tokio_zmq;
 /// #
 /// # use std::convert::TryInto;
 /// # use std::sync::Arc;
 /// #
-/// # use futures::{Future, FutureExt};
+/// # use futures_core::Future;
+/// # use futures_util::FutureExt;
 /// # use tokio_zmq::prelude::*;
 /// # use tokio_zmq::async::{MultipartResponse};
 /// # use tokio_zmq::{Error, Multipart, Rep, Socket};

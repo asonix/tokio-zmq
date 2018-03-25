@@ -20,9 +20,9 @@
 use std::mem::swap;
 use std::time::Duration;
 
-use futures::{Async, Future, Stream};
-use futures::future::Either;
-use futures::task::Context;
+use futures_core::{Async, Future, Stream};
+use futures_util::future::Either;
+use futures_core::task::Context;
 use tokio::reactor::PollEvented2;
 use tokio_file_unix::File;
 use tokio_timer::{Sleep, Timer};
@@ -44,12 +44,14 @@ use prelude::{ControlHandler, EndHandler};
 /// #![feature(conservative_impl_trait)]
 ///
 /// extern crate zmq;
-/// extern crate futures;
+/// extern crate futures_core;
+/// extern crate futures_util;
 /// extern crate tokio_zmq;
 ///
 /// use std::sync::Arc;
 ///
-/// use futures::{Stream, StreamExt};
+/// use futures_core::Stream;
+/// use futures_util::StreamExt;
 /// use tokio_zmq::async::MultipartStream;
 /// use tokio_zmq::{Error, Multipart, Socket};
 ///

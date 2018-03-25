@@ -20,7 +20,8 @@
 #![feature(try_from)]
 
 extern crate env_logger;
-extern crate futures;
+extern crate futures_channel;
+extern crate futures_util;
 extern crate log;
 extern crate tokio;
 extern crate tokio_zmq;
@@ -32,8 +33,8 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-use futures::{FutureExt, SinkExt, StreamExt};
-use futures::channel::mpsc;
+use futures_util::{FutureExt, SinkExt, StreamExt};
+use futures_channel::mpsc;
 use tokio_zmq::prelude::*;
 use tokio_zmq::{Pub, Req, Router, Sub};
 use tokio_zmq::{Multipart, Socket};

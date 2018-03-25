@@ -21,7 +21,7 @@
 
 use std::time::Duration;
 
-use futures::Stream;
+use futures_core::Stream;
 use tokio::reactor::PollEvented2;
 use tokio_file_unix::File;
 use zmq;
@@ -75,7 +75,7 @@ pub trait StreamSocket: AsSocket {
     /// ```rust
     /// #![feature(try_from)]
     ///
-    /// extern crate futures;
+    /// extern crate futures_util;
     /// extern crate tokio;
     /// extern crate tokio_zmq;
     /// extern crate zmq;
@@ -83,7 +83,7 @@ pub trait StreamSocket: AsSocket {
     /// use std::convert::TryInto;
     /// use std::sync::Arc;
     ///
-    /// use futures::FutureExt;
+    /// use futures_util::FutureExt;
     /// use tokio_zmq::prelude::*;
     /// use tokio_zmq::async::MultipartStream;
     /// use tokio_zmq::{Error, Multipart, Rep, Socket};
@@ -122,14 +122,14 @@ pub trait StreamSocket: AsSocket {
     /// #![feature(try_from)]
     ///
     /// extern crate zmq;
-    /// extern crate futures;
+    /// extern crate futures_util;
     /// extern crate tokio;
     /// extern crate tokio_zmq;
     ///
     /// use std::convert::TryInto;
     /// use std::sync::Arc;
     ///
-    /// use futures::{FutureExt, StreamExt};
+    /// use futures_util::{FutureExt, StreamExt};
     /// use tokio_zmq::prelude::*;
     /// use tokio_zmq::async::{MultipartStream};
     /// use tokio_zmq::{Error, Multipart, Socket, Sub};
@@ -172,14 +172,14 @@ pub trait SinkSocket: AsSocket {
     /// #![feature(try_from)]
     ///
     /// extern crate zmq;
-    /// extern crate futures;
+    /// extern crate futures_util;
     /// extern crate tokio;
     /// extern crate tokio_zmq;
     ///
     /// use std::convert::TryInto;
     /// use std::sync::Arc;
     ///
-    /// use futures::FutureExt;
+    /// use futures_util::FutureExt;
     /// use tokio_zmq::prelude::*;
     /// use tokio_zmq::async::MultipartStream;
     /// use tokio_zmq::{Error, Pub, Socket};
@@ -212,15 +212,15 @@ pub trait SinkSocket: AsSocket {
     /// #![feature(try_from)]
     ///
     /// extern crate zmq;
-    /// extern crate futures;
+    /// extern crate futures_util;
     /// extern crate tokio;
     /// extern crate tokio_zmq;
     ///
     /// use std::convert::TryInto;
     /// use std::sync::Arc;
     ///
-    /// use futures::{FutureExt, StreamExt};
-    /// use futures::stream::iter_ok;
+    /// use futures_util::{FutureExt, StreamExt};
+    /// use futures_util::stream::iter_ok;
     /// use tokio_zmq::prelude::*;
     /// use tokio_zmq::async::MultipartStream;
     /// use tokio_zmq::{Error, Multipart, Pub, Socket};
@@ -258,14 +258,14 @@ pub trait SinkStreamSocket: AsSocket {
     /// ```rust
     /// #![feature(try_from)]
     ///
-    /// extern crate futures;
+    /// extern crate futures_util;
     /// extern crate tokio_zmq;
     /// extern crate zmq;
     ///
     /// use std::convert::TryInto;
     /// use std::sync::Arc;
     ///
-    /// use futures::{FutureExt, StreamExt};
+    /// use futures_util::{FutureExt, StreamExt};
     /// use tokio_zmq::prelude::*;
     /// use tokio_zmq::{Socket, Rep};
     ///
@@ -297,14 +297,14 @@ pub trait WithEndHandler: Stream<Item = Multipart, Error = Error> + Sized {
     /// ```rust
     /// #![feature(try_from)]
     ///
-    /// extern crate futures;
+    /// extern crate futures_util;
     /// extern crate tokio_zmq;
     /// extern crate zmq;
     ///
     /// use std::convert::TryInto;
     /// use std::sync::Arc;
     ///
-    /// use futures::{FutureExt, StreamExt};
+    /// use futures_util::{FutureExt, StreamExt};
     /// use tokio_zmq::prelude::*;
     /// use tokio_zmq::{Socket, Sub, Multipart};
     ///
@@ -349,14 +349,14 @@ pub trait Controllable: Stream<Item = Multipart, Error = Error> + Sized {
     /// ```rust
     /// #![feature(try_from)]
     ///
-    /// extern crate futures;
+    /// extern crate futures_util;
     /// extern crate tokio_zmq;
     /// extern crate zmq;
     ///
     /// use std::convert::TryInto;
     /// use std::sync::Arc;
     ///
-    /// use futures::{FutureExt, StreamExt};
+    /// use futures_util::{FutureExt, StreamExt};
     /// use tokio_zmq::prelude::*;
     /// use tokio_zmq::{Socket, Pull, Sub, Multipart};
     ///
@@ -403,7 +403,7 @@ pub trait WithTimeout: Stream<Error = Error> + Sized {
     /// ```rust
     /// #![feature(try_from)]
     ///
-    /// extern crate futures;
+    /// extern crate futures_util;
     /// extern crate tokio_zmq;
     /// extern crate zmq;
     ///
@@ -411,7 +411,7 @@ pub trait WithTimeout: Stream<Error = Error> + Sized {
     /// use std::sync::Arc;
     /// use std::time::Duration;
     ///
-    /// use futures::{FutureExt, StreamExt};
+    /// use futures_util::{FutureExt, StreamExt};
     /// use tokio_zmq::prelude::*;
     /// use tokio_zmq::{Socket, Pull, Multipart};
     ///
