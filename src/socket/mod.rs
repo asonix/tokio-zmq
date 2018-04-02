@@ -25,7 +25,7 @@ pub mod types;
 use std::sync::Arc;
 
 use zmq;
-use tokio::reactor::PollEvented2;
+use tokio_reactor::PollEvented;
 use tokio_file_unix::File;
 
 use self::config::SocketBuilder;
@@ -40,7 +40,7 @@ pub struct Socket {
     // Reads and Writes data
     sock: zmq::Socket,
     // So we can hand out files to streams and sinks
-    file: PollEvented2<File<ZmqFile>>,
+    file: PollEvented<File<ZmqFile>>,
 }
 
 impl Socket {
@@ -50,7 +50,7 @@ impl Socket {
     }
 
     /// Retrieve a Reference-Counted Pointer to self's socket.
-    pub fn inner(self) -> (zmq::Socket, PollEvented2<File<ZmqFile>>) {
+    pub fn inner(self) -> (zmq::Socket, PollEvented<File<ZmqFile>>) {
         (self.sock, self.file)
     }
 
@@ -58,7 +58,7 @@ impl Socket {
     ///
     /// This assumes that `sock` is already configured properly. Please don't call this directly
     /// unless you know what you're doing.
-    pub fn from_sock_and_file(sock: zmq::Socket, file: PollEvented2<File<ZmqFile>>) -> Self {
+    pub fn from_sock_and_file(sock: zmq::Socket, file: PollEvented<File<ZmqFile>>) -> Self {
         Socket { sock, file }
     }
 
@@ -81,7 +81,7 @@ impl Socket {
     /// Retrieve a Future that consumes a multipart, sending it to the socket
     pub fn send<T>(self, multipart: Multipart) -> MultipartRequest<T>
     where
-        T: From<(zmq::Socket, PollEvented2<File<ZmqFile>>)>,
+        T: From<(zmq::Socket, PollEvented<File<ZmqFile>>)>,
     {
         MultipartRequest::new(self.sock, self.file, multipart)
     }
@@ -89,14 +89,14 @@ impl Socket {
     /// Retrieve a Future that produces a multipart, getting it fromthe socket
     pub fn recv<T>(self) -> MultipartResponse<T>
     where
-        T: From<(zmq::Socket, PollEvented2<File<ZmqFile>>)>,
+        T: From<(zmq::Socket, PollEvented<File<ZmqFile>>)>,
     {
         MultipartResponse::new(self.sock, self.file)
     }
 }
 
-impl From<(zmq::Socket, PollEvented2<File<ZmqFile>>)> for Socket {
-    fn from((sock, file): (zmq::Socket, PollEvented2<File<ZmqFile>>)) -> Self {
+impl From<(zmq::Socket, PollEvented<File<ZmqFile>>)> for Socket {
+    fn from((sock, file): (zmq::Socket, PollEvented<File<ZmqFile>>)) -> Self {
         Socket { sock, file }
     }
 }

@@ -26,7 +26,7 @@ use zmq;
 use futures_core::{Async, Future};
 use futures_core::task::Context;
 use futures_sink::Sink;
-use tokio::reactor::PollEvented2;
+use tokio_reactor::PollEvented;
 use tokio_file_unix::File;
 
 use message::Multipart;
@@ -69,7 +69,7 @@ use file::ZmqFile;
 ///
 ///     let msg = zmq::Message::from_slice(b"Some message");
 ///
-///     // tokio::reactor::run2(sink.send(msg.into())).unwrap();
+///     // tokio::runtime::run2(sink.send(msg.into())).unwrap();
 /// }
 /// ```
 pub struct MultipartSink {
@@ -77,19 +77,19 @@ pub struct MultipartSink {
 }
 
 pub(crate) enum SinkState {
-    Ready(zmq::Socket, PollEvented2<File<ZmqFile>>),
-    Pending(MultipartRequest<(zmq::Socket, PollEvented2<File<ZmqFile>>)>),
+    Ready(zmq::Socket, PollEvented<File<ZmqFile>>),
+    Pending(MultipartRequest<(zmq::Socket, PollEvented<File<ZmqFile>>)>),
     Polling,
 }
 
 impl MultipartSink {
-    pub fn new(sock: zmq::Socket, file: PollEvented2<File<ZmqFile>>) -> Self {
+    pub fn new(sock: zmq::Socket, file: PollEvented<File<ZmqFile>>) -> Self {
         MultipartSink {
             inner: SinkState::Ready(sock, file),
         }
     }
 
-    pub(crate) fn take_socket(&mut self) -> Option<(zmq::Socket, PollEvented2<File<ZmqFile>>)> {
+    pub(crate) fn take_socket(&mut self) -> Option<(zmq::Socket, PollEvented<File<ZmqFile>>)> {
         match self.polling() {
             SinkState::Ready(sock, file) => Some((sock, file)),
             SinkState::Pending(mut request) => {
@@ -101,7 +101,7 @@ impl MultipartSink {
         }
     }
 
-    pub(crate) fn give_socket(&mut self, sock: zmq::Socket, file: PollEvented2<File<ZmqFile>>) {
+    pub(crate) fn give_socket(&mut self, sock: zmq::Socket, file: PollEvented<File<ZmqFile>>) {
         match self.polling() {
             SinkState::Pending(mut request) => {
                 request.give_socket(sock, file);
@@ -121,7 +121,7 @@ impl MultipartSink {
 
     fn poll_request(
         &mut self,
-        mut request: MultipartRequest<(zmq::Socket, PollEvented2<File<ZmqFile>>)>,
+        mut request: MultipartRequest<(zmq::Socket, PollEvented<File<ZmqFile>>)>,
         cx: &mut Context,
     ) -> Result<Async<()>, Error> {
         match request.poll(cx)? {

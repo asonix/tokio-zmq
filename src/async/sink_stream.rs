@@ -26,7 +26,7 @@ use futures_core::{Async, Stream};
 use futures_core::task::Context;
 use futures_sink::Sink;
 use tokio_file_unix::File;
-use tokio::reactor::PollEvented2;
+use tokio_reactor::PollEvented;
 use zmq;
 
 use async::sink::MultipartSink;
@@ -75,7 +75,7 @@ use message::Multipart;
 ///
 ///     let (sink, stream) = sink_stream.split();
 ///
-///     // tokio::reactor::run2(stream.forward(sink));
+///     // tokio::runtime::run2(stream.forward(sink));
 /// }
 /// ```
 pub struct MultipartSinkStream {
@@ -89,14 +89,14 @@ enum SinkStreamState {
         MultipartSink,
         MultipartStream,
         zmq::Socket,
-        PollEvented2<File<ZmqFile>>,
+        PollEvented<File<ZmqFile>>,
     ),
-    Ready(zmq::Socket, PollEvented2<File<ZmqFile>>),
+    Ready(zmq::Socket, PollEvented<File<ZmqFile>>),
     Polling,
 }
 
 impl MultipartSinkStream {
-    pub fn new(sock: zmq::Socket, file: PollEvented2<File<ZmqFile>>) -> Self {
+    pub fn new(sock: zmq::Socket, file: PollEvented<File<ZmqFile>>) -> Self {
         MultipartSinkStream {
             inner: SinkStreamState::Ready(sock, file),
         }

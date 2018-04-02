@@ -22,7 +22,7 @@
 use std::time::Duration;
 
 use futures_core::Stream;
-use tokio::reactor::PollEvented2;
+use tokio_reactor::PollEvented;
 use tokio_file_unix::File;
 use zmq;
 
@@ -39,7 +39,7 @@ use socket::Socket;
 
 /// The `AsSocket` trait is implemented for all wrapper types. This makes implementing other traits a
 /// matter of saying a given type implements them.
-pub trait AsSocket: From<(zmq::Socket, PollEvented2<File<ZmqFile>>)> + Sized {
+pub trait AsSocket: From<(zmq::Socket, PollEvented<File<ZmqFile>>)> + Sized {
     /// Any type implementing `AsSocket` must have a way of returning a reference to a Socket.
     fn socket(self) -> Socket;
 }
@@ -280,7 +280,7 @@ pub trait SinkStreamSocket: AsSocket {
     ///
     ///     let fut = stream.forward(sink);
     ///
-    ///     // tokio::reactor::run2(fut.map(|_| ()).or_else(|e| {
+    ///     // tokio::runtime::run2(fut.map(|_| ()).or_else(|e| {
     ///     //     println!("Error: {}", e);
     ///     //     Ok(())
     ///     // }));
@@ -328,7 +328,7 @@ pub trait WithEndHandler: Stream<Item = Multipart, Error = Error> + Sized {
     ///
     ///     let fut = sub.stream().with_end_handler(End(0));
     ///
-    ///     // tokio::reactor::run2(fut.map(|_| ()).or_else(|e| {
+    ///     // tokio::runtime::run2(fut.map(|_| ()).or_else(|e| {
     ///     //     println!("Error: {}", e);
     ///     //     Ok(())
     ///     // }));
@@ -383,7 +383,7 @@ pub trait Controllable: Stream<Item = Multipart, Error = Error> + Sized {
     ///
     ///     let fut = pull.stream().controlled(sub.stream(), End);
     ///
-    ///     // tokio::reactor::run2(fut.map(|_| ()).or_else(|e| {
+    ///     // tokio::runtime::run2(fut.map(|_| ()).or_else(|e| {
     ///     //     println!("Error: {}", e);
     ///     //     Ok(())
     ///     // }));
@@ -425,7 +425,7 @@ pub trait WithTimeout: Stream<Error = Error> + Sized {
     ///     // Receive a Timeout after 30 seconds if the stream hasn't produced a value
     ///     let fut = pull.stream().timeout(Duration::from_secs(30));
     ///
-    ///     // tokio::reactor::run2(fut.map(|_| ()).or_else(|e| {
+    ///     // tokio::runtime::run2(fut.map(|_| ()).or_else(|e| {
     ///     //     println!("Error: {}", e);
     ///     //     Ok(())
     ///     // }));

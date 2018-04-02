@@ -21,7 +21,7 @@
 
 use std::convert::TryFrom;
 
-use tokio::reactor::PollEvented2;
+use tokio_reactor::PollEvented;
 use tokio_file_unix::File;
 use zmq;
 

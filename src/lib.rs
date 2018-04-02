@@ -101,8 +101,8 @@ extern crate futures_util;
 #[macro_use]
 extern crate log;
 extern crate mio;
-extern crate tokio;
 extern crate tokio_file_unix;
+extern crate tokio_reactor;
 extern crate tokio_timer_futures2 as tokio_timer;
 #[macro_use]
 extern crate tokio_zmq_derive;

@@ -23,7 +23,7 @@ use std::time::Duration;
 use futures_core::{Async, Future, Stream};
 use futures_util::future::Either;
 use futures_core::task::Context;
-use tokio::reactor::PollEvented2;
+use tokio_reactor::PollEvented;
 use tokio_file_unix::File;
 use tokio_timer::{Sleep, Timer};
 use zmq;
@@ -77,19 +77,19 @@ pub struct MultipartStream {
 }
 
 pub(crate) enum StreamState {
-    Ready(zmq::Socket, PollEvented2<File<ZmqFile>>),
-    Pending(MultipartResponse<(zmq::Socket, PollEvented2<File<ZmqFile>>)>),
+    Ready(zmq::Socket, PollEvented<File<ZmqFile>>),
+    Pending(MultipartResponse<(zmq::Socket, PollEvented<File<ZmqFile>>)>),
     Polling,
 }
 
 impl MultipartStream {
-    pub fn new(sock: zmq::Socket, file: PollEvented2<File<ZmqFile>>) -> Self {
+    pub fn new(sock: zmq::Socket, file: PollEvented<File<ZmqFile>>) -> Self {
         MultipartStream {
             inner: StreamState::Ready(sock, file),
         }
     }
 
-    pub(crate) fn take_socket(&mut self) -> Option<(zmq::Socket, PollEvented2<File<ZmqFile>>)> {
+    pub(crate) fn take_socket(&mut self) -> Option<(zmq::Socket, PollEvented<File<ZmqFile>>)> {
         match self.polling() {
             StreamState::Ready(sock, file) => Some((sock, file)),
             StreamState::Pending(mut response) => {
@@ -101,7 +101,7 @@ impl MultipartStream {
         }
     }
 
-    pub(crate) fn give_socket(&mut self, sock: zmq::Socket, file: PollEvented2<File<ZmqFile>>) {
+    pub(crate) fn give_socket(&mut self, sock: zmq::Socket, file: PollEvented<File<ZmqFile>>) {
         match self.polling() {
             StreamState::Pending(mut response) => {
                 response.give_socket(sock, file);
@@ -121,7 +121,7 @@ impl MultipartStream {
 
     fn poll_response(
         &mut self,
-        mut response: MultipartResponse<(zmq::Socket, PollEvented2<File<ZmqFile>>)>,
+        mut response: MultipartResponse<(zmq::Socket, PollEvented<File<ZmqFile>>)>,
         cx: &mut Context,
     ) -> Result<Async<Option<Multipart>>, Error> {
         match response.poll(cx)? {

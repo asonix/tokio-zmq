@@ -24,9 +24,9 @@ fn socket_derive(s: synstructure::Structure) -> quote::Tokens {
     if let Some(sb) = socket_binding {
         let name = sb.ast().ident;
         let from_parts = s.bound_impl(
-            "From<(zmq::Socket, PollEvented2<File<ZmqFile>>)>",
+            "From<(zmq::Socket, PollEvented<File<ZmqFile>>)>",
             quote! {
-                fn from(tup: (zmq::Socket, PollEvented2<File<ZmqFile>>)) -> Self {
+                fn from(tup: (zmq::Socket, PollEvented<File<ZmqFile>>)) -> Self {
                     #name {
                         inner: tup.into(),
                     }

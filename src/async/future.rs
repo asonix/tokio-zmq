@@ -25,7 +25,7 @@ use std::marker::PhantomData;
 use futures_core::{Async, Future};
 use futures_core::task::Context;
 use mio::Ready;
-use tokio::reactor::PollEvented2;
+use tokio_reactor::PollEvented;
 use tokio_file_unix::File;
 use zmq;
 
@@ -76,19 +76,19 @@ use message::Multipart;
 /// ```
 pub struct MultipartRequest<T>
 where
-    T: From<(zmq::Socket, PollEvented2<File<ZmqFile>>)>,
+    T: From<(zmq::Socket, PollEvented<File<ZmqFile>>)>,
 {
     sock: Option<zmq::Socket>,
-    file: Option<PollEvented2<File<ZmqFile>>>,
+    file: Option<PollEvented<File<ZmqFile>>>,
     multipart: Option<Multipart>,
     phantom: PhantomData<T>,
 }
 
 impl<T> MultipartRequest<T>
 where
-    T: From<(zmq::Socket, PollEvented2<File<ZmqFile>>)>,
+    T: From<(zmq::Socket, PollEvented<File<ZmqFile>>)>,
 {
-    pub fn new(sock: zmq::Socket, file: PollEvented2<File<ZmqFile>>, multipart: Multipart) -> Self {
+    pub fn new(sock: zmq::Socket, file: PollEvented<File<ZmqFile>>, multipart: Multipart) -> Self {
         MultipartRequest {
             sock: Some(sock),
             file: Some(file),
@@ -97,7 +97,7 @@ where
         }
     }
 
-    pub(crate) fn take_socket(&mut self) -> Option<(zmq::Socket, PollEvented2<File<ZmqFile>>)> {
+    pub(crate) fn take_socket(&mut self) -> Option<(zmq::Socket, PollEvented<File<ZmqFile>>)> {
         if self.sock.is_some() && self.file.is_some() {
             self.sock
                 .take()
@@ -107,7 +107,7 @@ where
         }
     }
 
-    pub(crate) fn give_socket(&mut self, sock: zmq::Socket, file: PollEvented2<File<ZmqFile>>) {
+    pub(crate) fn give_socket(&mut self, sock: zmq::Socket, file: PollEvented<File<ZmqFile>>) {
         self.sock = Some(sock);
         self.file = Some(file);
     }
@@ -221,7 +221,7 @@ where
 
 impl<T> Future for MultipartRequest<T>
 where
-    T: From<(zmq::Socket, PollEvented2<File<ZmqFile>>)>,
+    T: From<(zmq::Socket, PollEvented<File<ZmqFile>>)>,
 {
     type Item = T;
     type Error = Error;
@@ -286,19 +286,19 @@ where
 /// ```
 pub struct MultipartResponse<T>
 where
-    T: From<(zmq::Socket, PollEvented2<File<ZmqFile>>)>,
+    T: From<(zmq::Socket, PollEvented<File<ZmqFile>>)>,
 {
     sock: Option<zmq::Socket>,
-    file: Option<PollEvented2<File<ZmqFile>>>,
+    file: Option<PollEvented<File<ZmqFile>>>,
     multipart: Option<Multipart>,
     phantom: PhantomData<T>,
 }
 
 impl<T> MultipartResponse<T>
 where
-    T: From<(zmq::Socket, PollEvented2<File<ZmqFile>>)>,
+    T: From<(zmq::Socket, PollEvented<File<ZmqFile>>)>,
 {
-    pub fn new(sock: zmq::Socket, file: PollEvented2<File<ZmqFile>>) -> Self {
+    pub fn new(sock: zmq::Socket, file: PollEvented<File<ZmqFile>>) -> Self {
         MultipartResponse {
             sock: Some(sock),
             file: Some(file),
@@ -307,7 +307,7 @@ where
         }
     }
 
-    pub(crate) fn take_socket(&mut self) -> Option<(zmq::Socket, PollEvented2<File<ZmqFile>>)> {
+    pub(crate) fn take_socket(&mut self) -> Option<(zmq::Socket, PollEvented<File<ZmqFile>>)> {
         if self.sock.is_some() && self.file.is_some() {
             self.sock
                 .take()
@@ -317,7 +317,7 @@ where
         }
     }
 
-    pub(crate) fn give_socket(&mut self, sock: zmq::Socket, file: PollEvented2<File<ZmqFile>>) {
+    pub(crate) fn give_socket(&mut self, sock: zmq::Socket, file: PollEvented<File<ZmqFile>>) {
         self.sock = Some(sock);
         self.file = Some(file);
     }
@@ -412,7 +412,7 @@ where
 
 impl<T> Future for MultipartResponse<T>
 where
-    T: From<(zmq::Socket, PollEvented2<File<ZmqFile>>)>,
+    T: From<(zmq::Socket, PollEvented<File<ZmqFile>>)>,
 {
     type Item = (Multipart, T);
     type Error = Error;

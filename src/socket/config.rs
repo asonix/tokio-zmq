@@ -22,7 +22,7 @@
 use std::sync::Arc;
 
 use zmq;
-use tokio::reactor::PollEvented2;
+use tokio_reactor::PollEvented;
 use tokio_file_unix::File;
 
 use socket::Socket;
@@ -171,7 +171,7 @@ impl<'a> SockConfig<'a> {
 
         let fd = sock.get_fd()?;
 
-        let file = PollEvented2::new(File::new_nb(ZmqFile::from_raw_fd(fd))?);
+        let file = PollEvented::new(File::new_nb(ZmqFile::from_raw_fd(fd))?);
 
         Ok(Socket::from_sock_and_file(sock, file))
     }
@@ -231,7 +231,7 @@ impl<'a> SubConfig<'a> {
 
         let fd = sock.get_fd()?;
 
-        let file = PollEvented2::new(File::new_nb(ZmqFile::from_raw_fd(fd))?);
+        let file = PollEvented::new(File::new_nb(ZmqFile::from_raw_fd(fd))?);
 
         Ok(Socket::from_sock_and_file(sock, file))
     }
@@ -274,7 +274,7 @@ impl<'a> PairConfig<'a> {
 
         let fd = sock.get_fd()?;
 
-        let file = PollEvented2::new(File::new_nb(ZmqFile::from_raw_fd(fd))?);
+        let file = PollEvented::new(File::new_nb(ZmqFile::from_raw_fd(fd))?);
 
         Ok(Socket::from_sock_and_file(sock, file))
     }
