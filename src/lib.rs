@@ -17,7 +17,6 @@
  * along with Tokio ZMQ.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#![feature(conservative_impl_trait)]
 #![feature(try_from)]
 
 //! Tokio ZMQ, bringing ZeroMQ to the Tokio event loop

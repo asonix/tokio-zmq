@@ -14,10 +14,14 @@ futures-sink = "0.2.0-beta"
 futures-util = "0.2.0-beta"
 log = "0.4"
 mio = "0.6"
-tokio-file-unix = { version = "0.4", git = "https://github.com/asonix/tokio-file-unix.git" }
 tokio-timer-futures2 = "0.2"
 tokio-zmq-derive = { path = "tokio-zmq-derive", version = "0.4.0" }
 zmq = "0.8"
+
+[dependencies.tokio-file-unix]
+version = "0.5"
+git = "https://github.com/rufflewind/tokio-file-unix.git"
+branch = "dev"
 
 [dependencies.tokio-reactor]
 version = "0.1"
