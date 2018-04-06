@@ -11,8 +11,5 @@ quote = "0.3"
 syn = "0.11"
 synstructure = "0.6"
 
-[dev-dependencies.tokio-zmq]
-version = "*"
-
 [lib]
 proc-macro = true
