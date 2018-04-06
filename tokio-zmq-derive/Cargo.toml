@@ -12,7 +12,8 @@ syn = "0.11"
 synstructure = "0.6"
 
 [dev-dependencies.tokio-zmq]
-version = "0.1"
+version = "*"
+path = ".."
 
 [lib]
 proc-macro = true
