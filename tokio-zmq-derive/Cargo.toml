@@ -13,7 +13,6 @@ synstructure = "0.6"
 
 [dev-dependencies.tokio-zmq]
 version = "*"
-path = ".."
 
 [lib]
 proc-macro = true
