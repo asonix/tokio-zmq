@@ -1,15 +1,15 @@
 [package]
 name = "tokio-zmq-derive"
 description = "Provides derivation for Tokio ZMQ Socket wrapper types"
-version = "0.4.1"
+version = "0.4.2"
 license = "GPL-3.0"
 authors = ["Riley Trautman <asonix.dev@gmail.com>"]
 repository = "https://github.com/asonix/tokio-zmq"
 
 [dependencies]
-quote = "0.3"
-syn = "0.11"
-synstructure = "0.6"
+quote = "0.5"
+syn = "0.13"
+proc-macro2 = "0.3"
 
 [lib]
 proc-macro = true
