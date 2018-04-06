@@ -1,7 +1,7 @@
 [package]
 name = "tokio-zmq"
 description = "Provides Futures abstractions for ZeroMQ on the Tokio event-loop"
-version = "0.4.0-beta2"
+version = "0.4.0-beta3"
 license = "GPL-3.0"
 authors = ["Riley Trautman <asonix.dev@gmail.com>"]
 repository = "https://github.com/asonix/tokio-zmq"
@@ -9,9 +9,9 @@ readme = "README.md"
 keywords = ["zmq", "zeromq", "futures", "tokio"]
 
 [dependencies]
-futures-core = "0.2.0-beta"
-futures-sink = "0.2.0-beta"
-futures-util = "0.2.0-beta"
+futures-core = "=0.2.0-beta"
+futures-sink = "=0.2.0-beta"
+futures-util = "=0.2.0-beta"
 log = "0.4"
 mio = "0.6"
 tokio-file-unix = "0.5"
@@ -29,7 +29,7 @@ features = [ "unstable-futures" ]
 
 [dev-dependencies]
 env_logger = "0.4"
-futures-channel = "0.2.0-beta"
+futures-channel = "=0.2.0-beta"
 
 [dev-dependencies.tokio]
 version = "0.1"

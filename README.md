@@ -23,11 +23,13 @@ See the [examples folder](https://github.com/asonix/zmq-futures/tree/master/exam
 
 ### Getting Started
 
-Add the following to your Cargo.toml
+Add the following to your Cargo.toml (As of the futures 0.2.0 stable release, Tokio does not support
+futures2. It does have support for futures 0.2.0-beta, so pinning that version of futures is
+important)
 ```toml
 zmq = "0.8"
-tokio-zmq = "0.4.0-beta2"
-futures = "0.2.0-beta"
+tokio-zmq = "0.4.0-beta3"
+futures = "=0.2.0-beta"
 tokio = "0.1"
 ```
 
