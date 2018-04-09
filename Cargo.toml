@@ -9,9 +9,9 @@ readme = "README.md"
 keywords = ["zmq", "zeromq", "futures", "tokio"]
 
 [dependencies]
-futures-core = "=0.2.0-beta"
-futures-sink = "=0.2.0-beta"
-futures-util = "=0.2.0-beta"
+futures-core = "0.2.0"
+futures-sink = "0.2.0"
+futures-util = "0.2.0"
 log = "0.4"
 mio = "0.6"
 tokio-file-unix = "0.5"
@@ -20,17 +20,17 @@ tokio-zmq-derive = { path = "tokio-zmq-derive", version = "0.4.2" }
 zmq = "0.8"
 
 [dependencies.tokio-reactor]
-version = "0.1"
+git = "https://github.com/tokio-rs/tokio"
 features = [ "unstable-futures" ]
 
 [dev-dependencies.tokio-executor]
-version = "0.1"
+git = "https://github.com/tokio-rs/tokio"
 features = [ "unstable-futures" ]
 
 [dev-dependencies]
 env_logger = "0.4"
-futures-channel = "=0.2.0-beta"
+futures-channel = "0.2.0"
 
 [dev-dependencies.tokio]
-version = "0.1"
+git = "https://github.com/tokio-rs/tokio"
 features = [ "unstable-futures" ]
