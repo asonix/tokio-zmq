@@ -28,7 +28,7 @@ git = "https://github.com/tokio-rs/tokio"
 features = [ "unstable-futures" ]
 
 [dev-dependencies]
-env_logger = "0.4"
+env_logger = "0.5"
 futures-channel = "0.2.0"
 
 [dev-dependencies.tokio]
